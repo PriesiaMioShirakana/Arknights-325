@@ -11,6 +11,8 @@ namespace Stronghold
 			1 || MyHandSize > 100 || MyRewardCount < 1 || MyRewardCount > 6 || !bounded(MyRewardPrice) || MyRewardMaxTier < 1 || MyRewardMaxTier > 6 ||
 			MyRewardTierOffset < -6 || MyRewardTierOffset > 6 || MyDeployCap < 1 || MyDeployCap > 36 || MyTemporarySize > 100 || MyEquipmentPerChess < 1 || MyEquipmentPerChess > 100)
 			throw std::invalid_argument("invalid economy rules");
+		if (MyMaxArtsPerRound == 0 || MyMaxArtsPerRound > 1000000)
+			throw std::invalid_argument("invalid art limit");
 		for (const auto n : MyIncome)
 			if (!bounded(n))
 				throw std::invalid_argument("invalid income");

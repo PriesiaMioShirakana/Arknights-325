@@ -47,6 +47,7 @@ namespace Stronghold
 		[[nodiscard]] double Time() const noexcept { return _MyClock.Seconds(); }
 
 		[[nodiscard]] std::uint64_t Tick() const noexcept { return _MyClock.Tick(); }
+		[[nodiscard]] std::uint32_t RandomState() const noexcept { return _MyRandom.State(); }
 
 		// 单位引用跨新增单位保持有效；容器迭代器不跨会创建单位的回调保留，使用 ID 或下标。
 		[[nodiscard]] const std::deque<CombatUnit>& Units() const noexcept { return _MyUnits; }
@@ -54,6 +55,17 @@ namespace Stronghold
 		[[nodiscard]] std::span<const BattlePlayerState> Players() const noexcept { return _MyPlayers; }
 
 		[[nodiscard]] const CombatUnit& Unit(UnitId _id) const { return _MyUnits.at(Index(_id)); }
+
+		// 内置与 CUSTOM 内容共用的位置／范围查询；绝对格范围仍保持调用者给定的坐标。
+		[[nodiscard]] RulePositionMode PositionMode() const noexcept { return _MyInput.MyRulePositionMode; }
+		[[nodiscard]] bool GarrisonEffectsAfterExit() const noexcept { return _MyInput.MyGarrisonEffectsAfterExit; }
+
+		[[nodiscard]] bool RetainGrantedGarrisonsAfterExit() const noexcept { return _MyInput.MyRetainGrantedGarrisonsAfterExit; }
+
+		[[nodiscard]] WorldPoint RulePosition(UnitId _unit) const { return RulePosition(Unit(_unit)); }
+		[[nodiscard]] const std::bitset<FieldTiles>& RuleRange(UnitId _unit) const { return RuleRange(Unit(_unit)); }
+		[[nodiscard]] std::span<const int> RuleRangeKeys(UnitId _unit) const { return RuleRangeKeys(Unit(_unit)); }
+		[[nodiscard]] bool InRuleRange(UnitId _source, UnitId _target) const;
 
 		[[nodiscard]] BattleResult Result() const;
 
@@ -93,6 +105,9 @@ namespace Stronghold
 
 		std::uint64_t AddBuff(UnitId _target, BuffDefinition _definition);
 
+		// 普通同名增益取绝对值最强者；较弱而更晚到期的值在强者结束后恢复。
+		bool ApplyStrongest(UnitId _target, std::string _key, double _duration, BuffStrength _strength, UnitId _source = 0);
+
 		std::size_t RemoveBuff(UnitId _target, std::string_view _key);
 
 		bool RemoveBuff(UnitId _target, std::uint64_t _buff);
@@ -107,7 +122,18 @@ namespace Stronghold
 
 
 		// 技力接口分别表达“回复”和“修改”；INITIAL 绕过阻回，用于部署／联防继承。
-		double GainSp(UnitId _unit, double _amount, SpReason _reason = SpReason::GRANTED);
+		// 借出已装备道具的战斗效果；目录来自 BattleInput，重复借出同 ID 只刷新到期时间。
+		std::size_t LendEquipment(UnitId _from, UnitId _to, unsigned _maximumTier = 5, double _duration = 60);
+
+		struct LentEquipmentView
+		{
+			UnitId MyUnit{};
+			std::string_view MyItem{};
+			double MyUntil{};
+		};
+
+		[[nodiscard]] std::vector<LentEquipmentView> LentEquipment(UnitId _unit) const;
+		double GainSp(UnitId _unit, double _amount, SpReason _reason = SpReason::GRANTED, bool _silent = false);
 		void SetSpTotal(UnitId _unit, double _total);
 		void SetSpCostMultiplier(UnitId _unit, double _multiplier);
 		[[nodiscard]] double SpCost(UnitId _unit) const;
@@ -138,7 +164,7 @@ namespace Stronghold
 		bool CancelColdWind(std::uint64_t _handle);
 		[[nodiscard]] std::uint64_t ColdWindGusts(std::uint64_t _handle) const;
 		UnitId SpawnEnemy(EnemySpawn _spawn);
-		void Retreat(UnitId _unit, bool _permanent = false, RemovalReason _reason = RemovalReason::RETREAT);
+		void Retreat(UnitId _unit, bool _permanent = false, RemovalReason _reason = RemovalReason::RETREAT, bool _dying = false);
 		bool Redeploy(UnitId _unit, bool _free = true, std::optional<WorldPoint> _tile = std::nullopt, bool _keepSp = false);
 		[[nodiscard]] bool CanDeploy(WorldPoint _position, UnitId _excludedUnit = 0, bool _includeDown = true) const;
 		[[nodiscard]] bool IsDown(UnitId _unit) const;
@@ -170,9 +196,282 @@ namespace Stronghold
 		void AttachContent(ContentReference _reference, UnitId _unit, std::uint64_t _buff, std::size_t _owner);
 		void RetireContent(UnitId _unit, std::uint64_t _buff);
 		void NotifyContent(ContentEvent& _event);
+		void InstallUnitEffects(CombatUnit& _unit);
+		void NotifyMedics(ContentEvent& _event, bool _late = false);
+		void NotifyGenericSkill(ContentEvent& _event);
+		void InstallOperatorKit(CombatUnit& _unit);
+		void NotifyOperatorKits(ContentEvent& _event);
+		bool OperatorBeforeAttack(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void OperatorAfterHit(UnitId _source, UnitId _target);
+		[[nodiscard]] bool OperatorCanAttack(const CombatUnit& _unit) const;
+		void SortOperatorTargets(UnitId _source, std::vector<UnitId>& _targets, unsigned _limit = 0, const AttackProfile* _profile = nullptr);
+		void OperatorEnemiesInGrid(UnitId _source, std::span<const RangeOffset> _grid, std::vector<UnitId>& _targets);
+		[[nodiscard]] UnitId HighestHealthAllyInRange(UnitId _source) const;
+		void NotifyVendlas(ContentEvent& _event);
+		void TexasSkill(UnitId _unit, const TexasKit& _kit);
+		void SunbrSkill(UnitId _unit, const SunbrKit& _kit, ContentEventKind _event);
+		void GrantInsiderAmmo(UnitId _unit, std::uint64_t _deployment);
+		void OperatorReveal(UnitId _unit);
+		void NotifyOperatorObservers(ContentEvent& _event);
+		[[nodiscard]] bool OperatorInGrid(UnitId _source, UnitId _target, std::span<const RangeOffset> _grid) const;
+		void PodegoAura(UnitId _unit);
+		void PodegoStartZone(UnitId _unit, const PodegoKit& _kit);
+		void PodegoZonePulse(UnitId _unit, WorldPoint _point, double _damage);
+		void TinmanStartZone(UnitId _unit, const TinmanKit& _kit);
+		void TinmanZonePulse(UnitId _unit, WorldPoint _point, double _attack, std::uint64_t _sequence, bool _damage);
+		void IndigoTick(UnitId _unit, const IndigoKit& _kit, double _delta);
+		void UtageTick(UnitId _unit);
+		void UtageProtect(UnitId _unit, const UtageKit& _kit);
+
+		struct InsiderAmmoGrant
+		{
+			UnitId MySource{};
+			UnitId MyTarget{};
+			std::uint64_t MyDeployment{};
+			double MyAmount{};
+		};
+
+		std::vector<InsiderAmmoGrant> _MyInsiderGrants{};
+		bool _MyOperatorBeforeAttack{};
+		bool _MyTinmanWither{};
+
+		struct VendlaRuntime
+		{
+			UnitId MyUnit{};
+			UnitId MyProtege{};
+			UnitId MyHealingTarget{};
+			double MyCachedAt{-1};
+		};
+
+		std::deque<VendlaRuntime> _MyVendlas{};
+		std::vector<UnitId> _MyTexasUnits{};
+		std::vector<UnitId> _MyEstells{};
+		std::vector<UnitId> _MyPodegos{};
+		std::vector<UnitId> _MyUtages{};
+
+		void GenericHit(UnitId _source, UnitId _target, double _dealt);
+		void GenericElement(UnitId _source, UnitId _target, double _dealt);
+		void GenericHeal(UnitId _source);
+		void GenericEnemies(UnitId _source, std::vector<UnitId>& _targets, unsigned _limit = 0, bool _sort = true);
+		void GenericBurst(UnitId _source, double _scale);
+		void GenericDebuff(UnitId _source, UnitId _target, double _duration);
+		void MedicHealAttack(UnitId _source, UnitId _target, double _amount);
+		void SpawnMapCharacters();
+		std::vector<UnitId> _MyMedics{};
+
+		struct EquipmentRuntime
+		{
+			UnitId MyUnit{};
+			std::size_t MyEffect{};
+			unsigned MyUsed{};
+			std::uint64_t MyDeployment{};
+			std::string MyBuffKey{};
+			std::uint64_t MyTickBuff{};
+			std::optional<std::size_t> MyHammer{};
+			std::uint64_t MyHammerGeneration{};
+			std::optional<std::size_t> MyLend{};
+			EquipmentEffect MyLentEffect{};
+			std::vector<UnitId> MyTargets{};
+			double MyBonus{};
+			bool MyArmed{};
+			bool MyWasStealth{};
+			bool MyCombo{};
+			bool MyDoomed{};
+			double MyReadyAt{-std::numeric_limits<double>::infinity()};
+		};
+
+		enum class HammerKind : std::size_t { BURN, UNDYING, SPEED, TREMBLE };
+
+		struct HammerRuntime
+		{
+			UnitId MyUnit{};
+			unsigned MyReferences{};
+			std::uint64_t MyGeneration{};
+			std::array<unsigned, 4> MyOwned{};
+			std::array<std::optional<EquipmentParameters>, 4> MyParameters{};
+			std::bitset<4> MyFieldKinds{};
+			unsigned MySteam{};
+			std::optional<EquipmentParameters> MySteamParameters{};
+			std::string MySpeedKey{};
+			double MySpeed{};
+			std::uint64_t MyLockDeployment{};
+			std::uint64_t MyHeldDeployment{};
+			double MyUntil{-std::numeric_limits<double>::infinity()};
+		};
+
+		struct HammerField
+		{
+			double MyAt{-std::numeric_limits<double>::infinity()};
+			std::bitset<4> MyKinds{};
+		};
+
+		struct EquipmentBuffOwner
+		{
+			UnitId MyUnit{};
+			std::string MyKey{};
+		};
+
+		struct EquipmentLend
+		{
+			UnitId MyUnit{};
+			std::string MyItem{};
+			double MyUntil{};
+			std::uint64_t MyVersion{};
+			bool MyActive{true};
+			std::vector<EquipmentBuffOwner> MyBuffs{};
+			std::vector<std::size_t> MyEffects{};
+		};
+
+		void InitializeEquipment(std::size_t _index);
+		[[nodiscard]] const EquipmentEffect& EquipmentDefinition(const EquipmentRuntime& _runtime) const;
+		[[nodiscard]] bool EquipmentActive(const EquipmentRuntime& _runtime) const;
+		std::uint64_t ApplyEquipmentBuff(EquipmentRuntime& _runtime, UnitId _target, BuffDefinition _buff);
+		void TrackEquipmentBuff(std::size_t _lend, UnitId _target, std::string _key);
+		void ExpireEquipmentLend(std::size_t _index);
+		void InstallEquipmentLend(std::size_t _index, const EquipmentTemplate& _definition);
+		void CheckEquipmentFront(EquipmentRuntime& _runtime, bool _initial);
+		std::deque<EquipmentLend> _MyEquipmentLends{};
+
+		void InstallHammer(EquipmentRuntime& _runtime);
+		void ReleaseHammer(EquipmentRuntime& _runtime);
+		void RefreshHammer(HammerRuntime& _runtime);
+		void NotifyHammer(HammerRuntime& _runtime, ContentEvent& _event);
+		void HammerFatal(ContentEvent& _event, bool _held);
+		[[nodiscard]] unsigned HammerMultiplier(const HammerRuntime& _runtime, HammerKind _kind);
+		[[nodiscard]] const EquipmentParameters* HammerParameters(const HammerRuntime& _runtime, HammerKind _kind) const;
+		std::deque<HammerRuntime> _MyHammers{};
+		std::vector<HammerField> _MyHammerFields{};
+
+		void InstallEquipmentEffects(CombatUnit& _unit);
+		void NotifyEquipment(ContentEvent& _event, bool _early);
+		void NotifyEquipmentLate(ContentEvent& _event);
+		void EquipmentPeriodic(std::size_t _index);
+		void EquipmentSolvent(EquipmentRuntime& _runtime);
+		void NotifyEquipmentSignature(EquipmentRuntime& _runtime, ContentEvent& _event);
+		void BuildEnemyIndex();
+		void EquipmentEnemies(EquipmentRuntime& _runtime, const AttackProfile& _profile);
+		[[nodiscard]] bool EquipmentMember(const CombatUnit& _unit, std::string_view _bond) const;
+		[[nodiscard]] bool CarriesEquipment(const CombatUnit& _unit, std::string_view _base) const;
+		void RetypeWeakness(DamageInfo& _damage, UnitId _source, UnitId _target, bool _schoolMultipliers = false) const;
+		std::deque<EquipmentRuntime> _MyEquipment{};
+		std::array<std::vector<UnitId>, FieldTiles> _MyEnemyBuckets{};
+		bool _MyEquipmentEnemyQueries{};
+		bool _MyEquipmentHitEffects{};
+		bool _MyEquipmentStatusEffects{};
 		void RecordContentError(ContentReference _reference, std::string _message);
 
-		enum class ScheduledKind { CRATE_BREAK, TOKEN_EXPIRE, COLD_WIND, PROFESSION, AFTERSHOCK };
+		struct YanyouRuntime
+		{
+			UnitId MyUnit{};
+			UnitId MyLock{};
+			double MyFlameAccumulator{};
+			double MyAuraAccumulator{0.2};
+			double MyHoverOffset{};
+			std::optional<WorldPoint> MyKeysAt{};
+			std::uint64_t MyRangeRevision{};
+			std::vector<UnitId> MyTargets{};
+		};
+
+		void InstallYanyou(CombatUnit& _unit);
+		void RefreshYanyouRange(CombatUnit& _unit, YanyouRuntime& _state);
+		void NotifyYanyou(ContentEvent& _event);
+		void YanyouRadius(YanyouRuntime& _state, WorldPoint _point, double _radius);
+		[[nodiscard]] UnitId YanyouLock(const YanyouRuntime& _state) const;
+		[[nodiscard]] std::optional<WorldPoint> FindYanyouTile(std::size_t _player, const std::bitset<FieldTiles>& _taken) const;
+		void SpawnBondYanyou(std::size_t _index);
+		std::deque<YanyouRuntime> _MyYanyous{};
+
+		struct BattleGarrisonRuntime
+		{
+			UnitId MyUnit{};
+			std::size_t MyRule{};
+			std::string MyKey{};
+			std::vector<BondLayer> MyUsed{};
+			double MyWholeUsed{};
+			double MyCount{};
+			double MySteps{-1};
+			bool MyDoll{};
+			bool MyGranted{};
+			bool MyRetired{};
+		};
+
+		void InstallGarrisons();
+		void AddGarrison(UnitId _unit, std::size_t _rule, bool _granted = false);
+		void GrantGarrison(std::size_t _index);
+		bool RevokeGrantedGarrisons(UnitId _unit);
+		void RefreshGarrisons();
+		void RefreshGarrison(std::size_t _index);
+		void ApplyGarrisonAttributes(std::size_t _index, double _duration = 0);
+		void NotifyGarrisons(ContentEvent& _event, bool _late = false);
+		void GainGarrisonLayers(std::size_t _index);
+		[[nodiscard]] double GarrisonSteps(const BattleGarrisonRuntime& _state) const;
+		[[nodiscard]] bool GarrisonOnField(UnitId _unit) const;
+		[[nodiscard]] bool GarrisonSourceActive(UnitId _unit) const;
+		[[nodiscard]] bool GarrisonAmmoTarget(const BattleGarrisonRuntime& _state, UnitId _unit) const;
+		std::deque<BattleGarrisonRuntime> _MyGarrisons{};
+		std::array<std::vector<std::size_t>, static_cast<unsigned>(BattleGarrisonKind::COUNT)> _MyGarrisonGroups{};
+		std::vector<BattleGarrisonKind> _MyGarrisonOrder{};
+		bool _MyGarrisonReaders{};
+		bool _MyGarrisonPending{};
+
+		struct CoreBondRuntime
+		{
+			std::size_t MyPlayer{};
+			std::size_t MyEffect{};
+			std::vector<UnitId> MyMembers{};
+			std::vector<UnitId> MyKnocked{};
+			std::vector<UnitId> MyTargets{};
+			bool MyPower{};
+			bool MyExPower{};
+			bool MyPending{};
+			std::uint64_t MyCount{};
+			double MyBonus{};
+		};
+
+		void InstallCoreBonds();
+		void RefreshCoreBond(std::size_t _index);
+		void NotifyCoreBonds(ContentEvent& _event, bool _late = false);
+		void CoreBondPulse(std::size_t _index);
+		void SyncSargon(UnitId _unit);
+		void NotifyEgirDeath(ContentEvent& _event);
+		void DevourEgir(std::size_t _index);
+		void FlushEgirRevives();
+		std::size_t _MyEgirPasses{};
+		bool _MyEgirDevouring{};
+		std::vector<CoreBondRuntime> _MyCoreBonds{};
+
+		struct AddonBondRuntime
+		{
+			std::size_t MyPlayer{};
+			std::array<const AddonBondParameters*, static_cast<unsigned>(AddonBondKind::COUNT)> MyParameters{};
+			std::array<unsigned, static_cast<unsigned>(AddonBondKind::COUNT)> MyTiers{};
+			std::array<std::vector<UnitId>, static_cast<unsigned>(AddonBondKind::COUNT)> MyMembers{};
+			std::vector<UnitId> MyOperators{};
+			std::vector<UnitId> MyAura{};
+			std::vector<UnitId> MyNextAura{};
+			std::vector<std::pair<UnitId, double>> MyRaidTargets{};
+			std::vector<RangeOffset> MyRaidReach{};
+			std::deque<std::vector<UnitId>> MyShareFrames{};
+			std::size_t MyShareDepth{};
+			bool MyPending{};
+			bool MyAuraWide{};
+			double MyAuraSpeed{};
+			double MyArcaneMultiplier{1};
+			double MyArcaneLowMultiplier{1};
+		};
+
+		void InstallAddonBonds();
+		void RefreshAddonBonds(std::size_t _player, bool _initial = false);
+		void UpdateBondAura(std::size_t _player);
+		void PollRaidBond(std::size_t _player);
+		void NotifyAddonBonds(ContentEvent& _event, bool _late = false);
+		void NotifyIndomitable(ContentEvent& _event);
+		void ApplyEliteSpCost(CombatUnit& _unit, const AddonBondParameters& _parameters);
+		[[nodiscard]] double AddonLayers(const AddonBondRuntime& _state, AddonBondKind _kind) const;
+		std::vector<AddonBondRuntime> _MyAddonBonds{};
+		bool _MyBondHitEffects{};
+
+		enum class ScheduledKind { CRATE_BREAK, TOKEN_EXPIRE, COLD_WIND, PROFESSION, AFTERSHOCK, EQUIPMENT, EQUIPMENT_RETREAT, HAMMER, EQUIPMENT_EXPIRE, BOND_REFRESH, BOND_AURA, BOND_RAID, CORE_BOND_REFRESH, CORE_BOND_PULSE, GARRISON_REFRESH, INSIDER_AMMO, OPERATOR_REVEAL, PODEGO_AURA, PODEGO_ZONE, TINMAN_ZONE };
 
 		// 所有内置延迟动作共用稳定的时间／序号排序，不捕获 this，移动 Battle 安全。
 		struct ScheduledAction
@@ -184,7 +483,11 @@ namespace Stronghold
 			UnitId MyTarget{};
 			std::uint64_t MyHandle{};
 			double MyInterval{};
+			std::uint64_t MyVersion{};
 			WorldPoint MyPoint{};
+			double MyAmount{};
+			unsigned MyRemaining{};
+
 			static bool Later(const ScheduledAction& _left, const ScheduledAction& _right) noexcept
 			{
 				return std::isgreater(_left.MyAt, _right.MyAt) ||
@@ -221,6 +524,7 @@ namespace Stronghold
 			bool MyReturning{};
 			std::uint64_t MyAttackId{};
 			bool MySkillAttack{};
+			bool MyInitialPositionAttack{}; // 发射时捕获，瞬发技能结束后命中仍使用同一位置模式。
 		};
 
 		// 每层同步攻击独占工作区，回调中的强制攻击不会覆盖外层目标／连锁去重列表。
@@ -251,7 +555,7 @@ namespace Stronghold
 		[[nodiscard]] std::size_t Owner(std::string_view _id) const;
 
 		bool Deploy(CombatUnit& _unit, bool _initial = false, std::optional<WorldPoint> _tile = std::nullopt, std::optional<double> _keepSp = std::nullopt);
-		void RemoveUnit(CombatUnit& _unit, RemovalReason _reason, UnitId _source = 0, bool _permanent = false);
+		void RemoveUnit(CombatUnit& _unit, RemovalReason _reason, UnitId _source = 0, bool _permanent = false, bool _dying = false);
 		UnitId CreateEnemy(const EnemySpawn& _spawn, std::size_t _index);
 		[[nodiscard]] const EnemySpawn& SpawnDefinition(std::size_t _index) const;
 		void Schedule(ScheduledAction _action);
@@ -264,6 +568,7 @@ namespace Stronghold
 		void RefreshTerrain(CombatUnit& _unit, bool _reset = false);
 		void LayBody(CombatUnit& _unit);
 		static void ValidateDefinition(const CombatDefinition& _definition, bool _enemy);
+		static void ValidateBuff(const BuffDefinition& _definition);
 		static void ValidatePoint(WorldPoint _point, bool _spawn = false);
 
 		void SpawnDue();
@@ -284,6 +589,8 @@ namespace Stronghold
 		static void ValidateSpawnMetadata(const EnemySpawn& _spawn);
 		void PayBounty(const CombatUnit& _unit, UnitId _killer);
 		void InstallChoiceEffects();
+		void InstallBandEffects();
+		void NotifyBands(ContentEvent& _event, bool _early);
 		void NotifyChoices(const ContentEvent& _event);
 		void SyncChoiceFullHealth(UnitId _unit);
 		void InstallProfession(CombatUnit& _unit);
@@ -317,7 +624,11 @@ namespace Stronghold
 		void Recalculate(CombatUnit& _unit);
 
 		void RefreshRange(CombatUnit& _unit);
-		[[nodiscard]] std::bitset<399> RangeMask(const CombatUnit& _unit, std::span<const RangeOffset> _grid, int _extend) const;
+		[[nodiscard]] std::bitset<399> RangeMask(WorldPoint _origin, Facing _facing, std::span<const RangeOffset> _grid, int _extend, std::vector<int>* _order = nullptr) const;
+		[[nodiscard]] bool UsesInitialPosition(const CombatUnit& _unit) const noexcept;
+		[[nodiscard]] WorldPoint RulePosition(const CombatUnit& _unit) const noexcept;
+		[[nodiscard]] const std::bitset<FieldTiles>& RuleRange(const CombatUnit& _unit) const noexcept;
+		[[nodiscard]] std::span<const int> RuleRangeKeys(const CombatUnit& _unit) const noexcept;
 		[[nodiscard]] const AttackProfile& EffectiveAttack(const CombatUnit& _unit) const noexcept;
 		void ResetSkill(CombatUnit& _unit, bool _initial, std::optional<double> _carrySp);
 		void NormalizeSp(CombatUnit& _unit);
@@ -329,7 +640,7 @@ namespace Stronghold
 		[[nodiscard]] bool CanAutoSkill(const CombatUnit& _unit) const noexcept;
 		bool SkillAboutToAttack(CombatUnit& _unit);
 		void SkillDamaged(CombatUnit& _unit);
-		void SkillAttackPerformed(CombatUnit& _unit, bool _usedOverride, bool _noAmmo, std::size_t _targetCount);
+		void SkillAttackPerformed(CombatUnit& _unit, bool _usedOverride, bool _noAmmo, std::span<const UnitId> _targets);
 		double ApplyHealthLoss(UnitId _source, UnitId _target, double _amount, bool _recoverSp, const DamageInfo& _damage);
 
 		void RunBuffEffects(UnitId _source, UnitId _target, std::span<const BuffEffect> _effects, double _delta);
@@ -343,10 +654,10 @@ namespace Stronghold
 
 		[[nodiscard]] std::span<const UnitId> SelectTargets(std::size_t _limit);
 
-		void Attack(CombatUnit& _source, std::span<const UnitId> _targets, bool _noAmmo = false);
+		bool Attack(CombatUnit& _source, std::span<const UnitId> _targets, bool _noAmmo = false);
 
-		void Hit(UnitId _source, UnitId _target, const AttackProfile& _profile, WorldPoint _point = {});
-		[[nodiscard]] double MainAttackMultiplier(CombatUnit& _source, const CombatUnit& _target, const AttackProfile& _profile) noexcept;
+		void Hit(UnitId _source, UnitId _target, const AttackProfile& _profile, WorldPoint _point = {}, bool _initialPosition = false);
+		[[nodiscard]] double MainAttackMultiplier(CombatUnit& _source, const CombatUnit& _target, const AttackProfile& _profile, bool _initialPosition) noexcept;
 		void HealAttack(const CombatUnit& _source, UnitId _target, const AttackProfile& _profile);
 		[[nodiscard]] AttackScratch& AcquireAttackScratch();
 		[[nodiscard]] bool TargetableEnemy(const CombatUnit& _target, const AttackProfile& _profile) const noexcept;
@@ -380,6 +691,17 @@ namespace Stronghold
 		std::vector<ChoiceRuntime> _MyChoiceEffects;
 		std::vector<double> _MyChoiceHealing;
 		bool _MyChoiceFullHealth{};
+
+		struct BandRuntime
+		{
+			std::size_t MyPlayer{};
+			std::size_t MyEffect{};
+			unsigned MyUsed{};
+			std::vector<UnitId> MyChosen{};
+		};
+
+		std::vector<BandRuntime> _MyBandEffects;
+		bool _MyBandHitEffects{};
 		std::vector<ContentInstance> _MyContentInstances;
 		std::vector<ContentError> _MyContentErrors;
 		unsigned _MyContentDepth{};

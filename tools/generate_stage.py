@@ -64,5 +64,9 @@ def stage(tables, key, raw):
         MyInfectionDamage=number(infection.get('damage',70)), MyInfectionAttackPercent=number(infection.get('atk',.2)),
         MyInfectionAttackSpeed=number(aspd(infection.get('attack_speed',20))),
         MyInfectionDuration=number(infection.get('duration',300) if infection.get('duration',300)>0 else 300))
+    chars = [record('StageMapCharacter', MyId=quote(m['key']), MyTile=record('MapCharacterTile',
+        MyPosition=record('FieldPoint', MyRow=str(m['pos'][0]), MyColumn=str(m['pos'][1])),
+        MyFacing='Facing::'+m.get('dir', 'RIGHT'), MyMultiOnly=boolean('multi_only' in m.get('alias', '')))) for m in raw.get('mapChars', [])]
     return record('StageRecord', MyId=quote(key), MyName=quote(raw['name']),
-        MyTiles=tables.array('FieldTile',tiles), MyRules=rules, MyDevices=tables.array('StageDeviceRecord',devices))
+        MyTiles=tables.array('FieldTile',tiles), MyRules=rules, MyDevices=tables.array('StageDeviceRecord',devices),
+        MyMapCharacters=tables.array('StageMapCharacter', chars))

@@ -29,6 +29,7 @@ namespace Stronghold
 		bool MyCore{};
 		bool MyDownward{};
 		std::optional<double> MyMaximum{};
+		bool MyCanDisable{true};
 	};
 
 	struct BondItem

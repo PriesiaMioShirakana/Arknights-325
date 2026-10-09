@@ -57,5 +57,6 @@ def build_preparation_items(raw, tables):
         grid = item.get('rangeGrid') or [[0, 0]]
         rows.append(record('PreparationItemRule', MyId=quote(key), MyUse='ItemUse::'+use, MyEffects=tables.array('PreparationItemEffect', effects),
             MyRange=tables.array('RangeOffset', [record('RangeOffset', MyRow=str(r), MyColumn=str(c)) for r, c in grid]),
-            MyBond=record('BondItem', MyCanGiveBond=boolean(item.get('canGiveBond', False)), MyGrantedBond=quote(item.get('giveBondId') or ''))))
+            MyBond=record('BondItem', MyCanGiveBond=boolean(item.get('canGiveBond', False)), MyGrantedBond=quote(item.get('giveBondId') or '')),
+            MyFallbackPerfect=boolean('完美' in str(item.get('desc') or ''))))
     return tables.array('PreparationItemRule', rows)

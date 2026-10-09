@@ -13,24 +13,29 @@ namespace Stronghold
 	};
 
 	// 纯几何：受击区域不改变阻挡、移动和弹道落点；溅射中心判定仍使用单位位置。
-	[[nodiscard]] inline BodyRectangle HitRectangle(const CombatUnit& _unit) noexcept
+	[[nodiscard]] inline BodyRectangle HitRectangle(const CombatUnit& _unit, WorldPoint _position) noexcept
 	{
 		const auto area = _unit.MyDefinition.MyHitArea.value_or(HitArea{});
-		const auto x = _unit.MyPosition.MyX + area.MyOffsetX, y = _unit.MyPosition.MyY + area.MyOffsetY;
+		const auto x = _position.MyX + area.MyOffsetX, y = _position.MyY + area.MyOffsetY;
 		return BodyRectangle{.MyLeft = x - area.MyWidth / 2, .MyRight = x + area.MyWidth / 2,
 			.MyBottom = y - area.MyHeight / 2, .MyTop = y + area.MyHeight / 2};
 	}
 
-	[[nodiscard]] inline FieldRect BodyTiles(const CombatUnit& _unit) noexcept
+	[[nodiscard]] inline BodyRectangle HitRectangle(const CombatUnit& _unit) noexcept
+	{
+		return HitRectangle(_unit, _unit.MyPosition);
+	}
+
+	[[nodiscard]] inline FieldRect BodyTiles(const CombatUnit& _unit, WorldPoint _position) noexcept
 	{
 		if (!_unit.MyDefinition.MyHitArea)
 		{
-			const auto y = std::floor(_unit.MyPosition.MyY + 0.5), x = std::floor(_unit.MyPosition.MyX + 0.5);
+			const auto y = std::floor(_position.MyY + 0.5), x = std::floor(_position.MyX + 0.5);
 			if (!std::isgreaterequal(y, 0) || !std::isless(y, FieldRows) || !std::isgreaterequal(x, 0) || !std::isless(x, FieldColumns)) return FieldRect{.MyFirstRow = 1, .MyLastRow = 0};
 			const auto row = static_cast<int>(y), column = static_cast<int>(x);
 			return FieldRect{.MyFirstRow = row, .MyLastRow = row, .MyFirstColumn = column, .MyLastColumn = column};
 		}
-		const auto box = HitRectangle(_unit);
+		const auto box = HitRectangle(_unit, _position);
 		// 开区间相交：只触到格边不算占格。先钳制再转整数，极大合法尺寸也不溢出。
 		return FieldRect{
 			.MyFirstRow = static_cast<int>(std::clamp(std::floor(box.MyBottom + 0.5 + 1e-9), 0.0, static_cast<double>(FieldRows))),
@@ -39,13 +44,23 @@ namespace Stronghold
 			.MyLastColumn = static_cast<int>(std::clamp(std::ceil(box.MyRight - 0.5 - 1e-9), -1.0, static_cast<double>(FieldColumns - 1)))};
 	}
 
-	[[nodiscard]] inline bool BodyInRange(const CombatUnit& _unit, const std::bitset<FieldTiles>& _mask) noexcept
+	[[nodiscard]] inline FieldRect BodyTiles(const CombatUnit& _unit) noexcept
 	{
-		const auto tiles = BodyTiles(_unit);
+		return BodyTiles(_unit, _unit.MyPosition);
+	}
+
+	[[nodiscard]] inline bool BodyInRange(const CombatUnit& _unit, const std::bitset<FieldTiles>& _mask, WorldPoint _position) noexcept
+	{
+		const auto tiles = BodyTiles(_unit, _position);
 		for (int row = tiles.MyFirstRow; row <= tiles.MyLastRow; ++row)
 			for (int column = tiles.MyFirstColumn; column <= tiles.MyLastColumn; ++column)
 				if (_mask[static_cast<std::size_t>(FieldGrid::Key(row, column))]) return true;
 		return false;
+	}
+
+	[[nodiscard]] inline bool BodyInRange(const CombatUnit& _unit, const std::bitset<FieldTiles>& _mask) noexcept
+	{
+		return BodyInRange(_unit, _mask, _unit.MyPosition);
 	}
 
 	[[nodiscard]] inline bool BodyOnTile(const CombatUnit& _unit, int _row, int _column) noexcept

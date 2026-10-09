@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <stronghold/domain/preparation.hpp>
 #include <type_traits>
+#include "preparation_hooks.hpp"
 
 namespace Stronghold
 {
@@ -40,6 +41,7 @@ namespace Stronghold
 			{
 				Player player;
 				player.MyPool = poolIndex;
+				player.MySeat = std::ranges::find(_players, id, &Seat::MyPlayerId)->MySeat;
 				player.MyView.MyPlayerId = id;
 				player.MyView.MyUpgradePrice = _MyRules.UpgradeAt(1);
 				player.MyView.MyHand.resize(_MyRules.MyHandSize);
@@ -62,7 +64,8 @@ namespace Stronghold
 		{
 			auto& view = player.MyView;
 			if (!view.MyAlive) continue;
-			const auto income = next._MyRules.IncomeAt(_round);
+			std::int64_t income = next._MyRules.IncomeAt(_round);
+			if (next._MyHooks) next._MyHooks->Income(next, view.MyPlayerId, income);
 			if (view.MyFunds > std::numeric_limits<std::int64_t>::max() - view.MyPendingFunds ||
 				view.MyFunds + view.MyPendingFunds > std::numeric_limits<std::int64_t>::max() - income) throw std::overflow_error("preparation income overflow");
 			view.MyRoundStatistics = {};
@@ -102,6 +105,7 @@ namespace Stronghold
 			if (player.MyView.MyAlive)
 			{
 				player.MyView.MyReady = false; next.CheckItemMerges(player, events); next.LiftOutOfRange(player); next.FillHand(player.MyView);
+				if (next._MyHooks) next._MyHooks->PreparationStarted(next, player.MyView.MyPlayerId, events);
 			}
 		++next._MyRevision; Commit(std::move(next));
 	}
@@ -298,11 +302,10 @@ namespace Stronghold
 						return CommandError::BAD_TARGET;
 					if (slot->MySold)
 						return CommandError::SOLD_OUT;
+					std::int64_t price = slot->MyPrice;
 					if constexpr (std::is_same_v<Action, Buy>)
-					{
-						if (view.MyFunds < slot->MyPrice)
-							return CommandError::NO_FUNDS;
-					}
+						if (_MyHooks) price = _MyHooks->Price(*this, view.MyPlayerId, *slot);
+					if (view.MyFunds < price) return CommandError::NO_FUNDS;
 					const auto& definition = _MyCatalog.At(slot->MyId);
 					if (!Selected(view, definition)) return CommandError::BAD_TARGET;
 					const auto* stock = Stock(_player, definition.MyBaseId);
@@ -311,7 +314,6 @@ namespace Stronghold
 						return CommandError::SOLD_OUT;
 					if (FreeSlot(view) == view.MyHand.size())
 						return CommandError::HAND_FULL;
-					const auto price = slot->MyPrice;
 					if (view.MyFunds < price)
 						return CommandError::NO_FUNDS;
 					(void)Spend(view, price);
@@ -325,9 +327,13 @@ namespace Stronghold
 						++view.MyStatistics.MyBuys; ++view.MyRoundStatistics.MyBuys;
 						ApplyPurchaseUpgrade(_player, *uid, _events);
 					}
-					const auto& piece = Locate(view, *uid)->Get(view);
 					constexpr auto Kind = std::is_same_v<Action, Buy> ? EventKind::PURCHASED : EventKind::REWARD_PICKED;
-					_events.push_back({Kind, piece.MyId, piece.MyUid, price});
+					_events.push_back({Kind, GrantDefinition(view, *uid, definition.MyId, _events), *uid, price});
+					if (_MyHooks)
+					{
+						if constexpr (std::is_same_v<Action, Buy>) _MyHooks->Bought(*this, view.MyPlayerId, definition.MyId, _events);
+						_MyHooks->Spent(*this, view.MyPlayerId, price, _events);
+					}
 				}
 				else if constexpr (std::is_same_v<Action, Refresh>)
 				{
@@ -338,6 +344,7 @@ namespace Stronghold
 					RollShop(_player, false);
 					++view.MyStatistics.MyRefreshes; ++view.MyRoundStatistics.MyRefreshes;
 					_events.emplace_back(EconomyEvent{.MyKind = EventKind::REFRESHED, .MyDefinitionId = {}, .MyAmount = price});
+					if (_MyHooks) { _MyHooks->Refreshed(*this, view.MyPlayerId, _events); _MyHooks->Spent(*this, view.MyPlayerId, price, _events); }
 				}
 				else if constexpr (std::is_same_v<Action, Freeze>)
 				{
@@ -359,6 +366,7 @@ namespace Stronghold
 					view.MyUpgradePrice = _MyRules.UpgradeAt(view.MyLevel);
 					RollShop(_player, false, true);
 					_events.push_back({EventKind::LEVELLED, {}, 0, price});
+					if (_MyHooks) { _MyHooks->Levelled(*this, view.MyPlayerId, _events); _MyHooks->Spent(*this, view.MyPlayerId, price, _events); }
 				}
 				else if constexpr (std::is_same_v<Action, SetReady>)
 				{
@@ -388,10 +396,13 @@ namespace Stronghold
 						auto piece = Detach(view, *location); RemoveTokens(view, piece.MyUid);
 						for (auto& item : piece.MyItems)
 							if (!Stow(view, item)) throw std::logic_error("sale lost equipment despite reserved space");
-						AddFunds(view, definition.MySellPrice);
-						++view.MyStatistics.MySells; ++view.MyRoundStatistics.MySells;
 						(void)ReturnCopies(_player, definition.MyBaseId, piece.MyPoolCopies);
-						_events.emplace_back(EconomyEvent{.MyKind = EventKind::SOLD, .MyDefinitionId = definition.MyId, .MyUid = piece.MyUid, .MyAmount = definition.MySellPrice});
+						std::int64_t gain = definition.MySellPrice;
+						piece.MyItems.clear();
+						if (_MyHooks) _MyHooks->Sold(*this, view.MyPlayerId, piece, gain, _events);
+						AddFunds(view, gain);
+						++view.MyStatistics.MySells; ++view.MyRoundStatistics.MySells;
+						_events.emplace_back(EconomyEvent{.MyKind = EventKind::SOLD, .MyDefinitionId = definition.MyId, .MyUid = piece.MyUid, .MyAmount = gain});
 						CheckItemMerges(_player, _events);
 					}
 					else
@@ -406,6 +417,8 @@ namespace Stronghold
 				{
 					if (const auto error = Equip(_player, _action, _events)) return error;
 				}
+				else if constexpr (std::is_same_v<Action, UseArt>)
+					return CommandError::BAD_TARGET; // 法术必须通过 PreparationContent 事务执行。
 				else if constexpr (std::is_same_v<Action, MoveToBoard> || std::is_same_v<Action, MoveToHand>)
 				{
 					if (const auto error = Move(_player, _action))

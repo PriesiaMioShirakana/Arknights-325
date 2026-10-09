@@ -92,7 +92,7 @@ def main():
                   'MyUpgrades': '{' + ','.join(map(str, mode['upgradePrices'])) + '}',
                   'MyHandSize': economy['benchSize'], 'MyTemporarySize': economy.get('tempSize', 5), 'MyEquipmentPerChess': economy.get('equipPerChess', 2), 'MyDeployCap': economy['deployCap'], 'MyRewardCount': reward['count'],
                   'MyRewardTierOffset': reward['tierOffset'], 'MyRewardMaxTier': reward['maxTier'],
-                  'MyRewardPrice': reward['price']}
+                  'MyRewardPrice': reward['price'], 'MyMaxArtsPerRound': economy.get('maxArtsPerRound', 2)}
         for name, value in fields.items():
             lines.append(f'rules.{name} = {value};')
         for level, layout in mode['shopSlots'].items():

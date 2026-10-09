@@ -38,6 +38,7 @@ namespace Stronghold
 		bool MyFlying{};
 		EnemyRank MyRank{};
 		bool MyTokenOnly{};
+		bool MyNotCounted{};
 	};
 
 	struct WavePlaceholder { std::string_view MyEnemyId{}; WaveSlot MySlot{}; };
@@ -120,6 +121,18 @@ namespace Stronghold
 	};
 
 	enum class WaveSide { ANY, LEFT, RIGHT };
+
+	struct DuckWaveRules
+	{
+		std::string_view MyStrategy{};
+		unsigned MyFirstRound{1};
+		unsigned MyMinimum{};
+		unsigned MyMaximum{};
+		double MyStartFraction{};
+		double MyEndFraction{1};
+		std::int64_t MyCoins{1};
+		std::span<const std::string_view> MyEnemies{};
+	};
 
 	struct WaveBounty
 	{
@@ -204,6 +217,9 @@ namespace Stronghold
 		[[nodiscard]] WavePlan WithBounties(const WavePlan& _plan, unsigned _round, std::span<const WaveBounty> _bounties,
 			std::string_view _player, WaveSide _side = WaveSide::ANY, bool _retimeOwn = true) const;
 		[[nodiscard]] WavePlan BuildUnite(std::span<const WaveLeak> _leaks, unsigned _helpers) const;
+		// 对选中半场按出生顺序取区间、洗牌，再原位拆分多单位动作；返回实际替换数。
+		[[nodiscard]] std::size_t ReplaceDucks(WavePlan& _plan, Random& _random, const DuckWaveRules& _rules,
+			std::string_view _owner, WaveSide _side = WaveSide::ANY) const;
 		[[nodiscard]] const WaveRecord* Template(std::string_view _id) const noexcept;
 		[[nodiscard]] std::vector<EnemySpawn> MakeSpawns(const WavePlan& _plan, std::span<const BattlePlayerInput> _players, FieldRect _rect) const;
 		[[nodiscard]] std::vector<CombatRoute> MakeGroundRoutes(const WavePlan& _plan, FieldRect _rect) const;

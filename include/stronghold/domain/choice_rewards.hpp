@@ -40,7 +40,14 @@ namespace Stronghold
 		std::optional<bool> MyPreparationPassed{};
 		std::optional<std::size_t> MyBenchCount{};
 	};
-	struct ChoiceRewardPlayerConfig { std::string_view MyPlayerId{}; std::span<const ContentPoolRoster> MyRoster{}; };
+	struct ChoiceRewardPlayerConfig
+	{
+		std::string_view MyPlayerId{};
+		std::span<const ContentPoolRoster> MyRoster{};
+		std::span<const std::string_view> MyInactiveBonds{};
+		std::string_view MyStrategy{};
+	};
+
 	struct ChoiceRewardView
 	{
 		std::string MyPlayerId{};

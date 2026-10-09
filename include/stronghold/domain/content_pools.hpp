@@ -24,6 +24,7 @@ namespace Stronghold
 	{
 		std::string_view MyId{};
 		std::span<const std::string_view> MyBonds{};
+		std::span<const std::string_view> MyGarrisons{};
 	};
 
 	struct ContentItemDraw

@@ -83,7 +83,7 @@ namespace Stronghold
 				const auto& source = Unit(area.MySourceUnit);
 				if (!source.MyAlive || source.MyHidden) continue;
 			}
-			const auto& mask = area.MySourceUnit ? Unit(area.MySourceUnit).MyRangeMask : area.MyMask;
+			const auto& mask = area.MySourceUnit ? RuleRange(area.MySourceUnit) : area.MyMask;
 			const AttackProfile profile{.MyCanHitFlying = area.MyCanHitFlying, .MyHitSleep = area.MyHitSleep, .MyGroundOnly = area.MyGroundOnly};
 			for (const auto id : _MyEnemyIds)
 				if (const auto& target = Unit(id); TargetableEnemy(target, profile) && BodyInRange(target, mask)) return true;
@@ -131,22 +131,22 @@ namespace Stronghold
 		skill.MySp = std::min(skill.MySp, cost);
 	}
 
-	double Battle::GainSp(UnitId _unit, double _amount, SpReason _reason)
+	double Battle::GainSp(UnitId _unit, double _amount, SpReason _reason, bool _silent)
 	{
 		auto& unit = _MyUnits[Index(_unit)];
 		const auto& definition = unit.MyDefinition.MySkill;
 		auto& skill = unit.MySkill;
-		if (!std::isfinite(_amount) || !std::isgreater(_amount, 0) || !_MyStarted || Finished() || !unit.MyAlive ||
+		if (!std::isfinite(_amount) || !std::isgreater(_amount, 0) || !_MyStarted || Finished() ||
 			definition.MyKind == SkillKind::NONE || definition.MyKind == SkillKind::PASSIVE) return 0;
 		if (_reason != SpReason::INITIAL && ((skill.MyActive && IsTimedSkill(definition.MyKind)) || unit.MyStatuses.Has(CombatStatus::NO_SP))) return 0;
 		auto cost = SpCost(_unit);
 		if (skill.MyCharges >= definition.MyMaxCharges && std::isgreaterequal(skill.MySp, cost)) return 0;
-		if (_reason != SpReason::INITIAL)
+		if (!_silent)
 		{
 			ContentEvent event{.MyKind = ContentEventKind::SP_GAIN, .MyUnit = _unit, .MyAmount = _amount, .MySpReason = _reason};
 			NotifyContent(event);
 			_amount = event.MyAmount;
-			if (event.MyCancel || !unit.MyAlive || Finished() || !std::isfinite(_amount) || !std::isgreater(_amount, 0)) return 0;
+			if (event.MyCancel || Finished() || !std::isfinite(_amount) || !std::isgreater(_amount, 0)) return 0;
 			cost = SpCost(_unit); // 回调可改变费用，不能使用广播前的缓存值。
 			if (skill.MyCharges >= definition.MyMaxCharges && std::isgreaterequal(skill.MySp, cost)) return 0;
 		}
@@ -160,11 +160,11 @@ namespace Stronghold
 	{
 		auto& unit = _MyUnits[Index(_unit)];
 		const auto kind = unit.MyDefinition.MySkill.MyKind;
-		if (!_MyStarted || Finished() || !unit.MyAlive || !std::isfinite(_total) || kind == SkillKind::NONE ||
+		if (!_MyStarted || Finished() || !std::isfinite(_total) || kind == SkillKind::NONE ||
 			kind == SkillKind::PASSIVE || (unit.MySkill.MyActive && IsTimedSkill(kind))) return;
 		unit.MySkill.MySp = 0;
 		unit.MySkill.MyCharges = 0;
-		GainSp(_unit, std::max(0.0, _total), SpReason::INITIAL);
+		GainSp(_unit, std::max(0.0, _total), SpReason::INITIAL, true);
 		if (!std::isgreater(SpCost(_unit), 0)) unit.MySkill.MyCharges = unit.MyDefinition.MySkill.MyMaxCharges;
 	}
 
@@ -215,7 +215,7 @@ namespace Stronghold
 				.MySource = _unit.MyId,
 				.MyModifiers = definition.MyModifiers,
 				.MyFlags = definition.MyFlags});
-		RefreshRange(_unit);
+		if (!definition.MyRange.empty() || definition.MyRangeExtend != 0 || definition.MyNoRangeExtend) RefreshRange(_unit);
 	}
 
 	bool Battle::ActivateSkill(UnitId _unit, bool _free, SkillReason _reason)
@@ -267,7 +267,8 @@ namespace Stronghold
 		if (skill.MyActive || activation != skill.MyActivations) return;
 		if (buff) (void)RemoveBuff(_unit, buff);
 		skill.MyBuff = 0;
-		RefreshRange(unit);
+		const auto& definition = unit.MyDefinition.MySkill;
+		if (!definition.MyRange.empty() || definition.MyRangeExtend != 0 || definition.MyNoRangeExtend) RefreshRange(unit);
 		event.MyKind = ContentEventKind::SKILL_END;
 		NotifyContent(event);
 	}
@@ -315,7 +316,7 @@ namespace Stronghold
 		if (!_allyOnly && rule == SkillTrigger::SP_FULL) return true;
 		const bool custom = !definition.MyTriggerRange.empty() && (_allyOnly || rule == SkillTrigger::ACTIVE_RANGE ||
 			rule == SkillTrigger::SKILL_RANGE || rule == SkillTrigger::CUSTOM_RANGE);
-		const auto& mask = custom ? _unit.MySkill.MyTriggerMask : _unit.MyBaseRangeMask;
+		const auto& mask = custom ? _unit.MySkill.MyTriggerMask : _unit.MyBaseTriggerMask;
 		const bool global = !_allyOnly && rule == SkillTrigger::GLOBAL;
 		const bool healing = _allyOnly || (rule == SkillTrigger::SKILL_RANGE && definition.MyTriggerAllies) ||
 			(!(custom && (rule == SkillTrigger::CUSTOM_RANGE || rule == SkillTrigger::SKILL_RANGE)) && definition.MyHealSkill);
@@ -325,11 +326,11 @@ namespace Stronghold
 			if (!target.MyAlive || target.MyHidden) continue;
 			if (healing)
 			{
-				if (target.MySide != UnitSide::ALLY || target.MyDefinition.MyAttack.MyNoHeal || target.MyStatuses.Has(CombatStatus::HEAL_FREE) ||
-					(target.MyId != _unit.MyId && target.MyStatuses.Has(CombatStatus::NO_HEAL)) ||
+				if (target.MySide != UnitSide::ALLY ||
+					(target.MyId != _unit.MyId && (target.MyStatuses.Has(CombatStatus::NO_HEAL) || target.MyDefinition.MyAttack.MyNoHeal)) ||
 					!std::isless(target.MyHealth, target.MyStats.MyMaxHealth - 1e-6)) continue;
 				if ((_allyOnly || definition.MyTriggerAllies) && std::isgreater(target.MyHealth / target.MyStats.MyMaxHealth, definition.MyTriggerHpAtMost + 1e-9)) continue;
-				if (global || Contains(mask, target.MyPosition)) return true;
+				if (global || Contains(mask, RulePosition(target))) return true;
 			}
 			else if (target.MySide == UnitSide::ENEMY)
 			{
@@ -402,12 +403,12 @@ namespace Stronghold
 			ActivateSkill(_unit.MyId, false, SkillReason::TRIGGER);
 	}
 
-	void Battle::SkillAttackPerformed(CombatUnit& _unit, bool _usedOverride, bool _noAmmo, std::size_t _targetCount)
+	void Battle::SkillAttackPerformed(CombatUnit& _unit, bool _usedOverride, bool _noAmmo, std::span<const UnitId> _targets)
 	{
 		const auto& definition = _unit.MyDefinition.MySkill;
 		auto& skill = _unit.MySkill;
 		const bool skillAttack = skill.MyActive && (IsTimedSkill(definition.MyKind) || (_usedOverride && skill.MyPending));
-		ContentEvent event{.MyKind = ContentEventKind::ATTACK, .MyUnit = _unit.MyId, .MySource = _unit.MyId, .MyNoAmmo = _noAmmo, .MyTargetCount = _targetCount};
+		ContentEvent event{.MyKind = ContentEventKind::ATTACK, .MyUnit = _unit.MyId, .MySource = _unit.MyId, .MyNoAmmo = _noAmmo, .MyTargetCount = _targets.size(), .MyTargets = _targets};
 		NotifyContent(event);
 		if (Finished() || !_unit.MyAlive) return;
 		if (skill.MyActive && definition.MyKind == SkillKind::AMMO)

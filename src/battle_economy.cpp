@@ -19,8 +19,9 @@ namespace Stronghold
 		{
 			const auto& unit = Unit(_options.MySource);
 			const bool justDied = !unit.MyAlive && !std::islessgreater(unit.MyRemovedAt, Time());
-			if (!tile && ((unit.MyAlive && !unit.MyHidden) || justDied))
-				tile = unit.MySide == UnitSide::ALLY ? unit.MyHome : WorldPoint{.MyX = std::floor(unit.MyPosition.MyX + 0.5), .MyY = std::floor(unit.MyPosition.MyY + 0.5)};
+			const bool continuingGarrison = _MyInput.MyGarrisonEffectsAfterExit && _options.MyReason == "garrison" && GarrisonSourceActive(unit.MyId);
+			if (!tile && ((unit.MyAlive && !unit.MyHidden) || justDied || continuingGarrison))
+				tile = unit.MySide == UnitSide::ALLY ? (unit.MyDefinition.MyYanyou ? unit.MyHome : RulePosition(unit)) : WorldPoint{.MyX = std::floor(unit.MyPosition.MyX + 0.5), .MyY = std::floor(unit.MyPosition.MyY + 0.5)};
 		}
 		// 钩子可能创建新的盟约条目；复制小 ID，且不跨钩子持有 vector 迭代器或字符串视图。
 		const std::string bondId(_bondId);
@@ -48,7 +49,7 @@ namespace Stronghold
 
 	void Battle::ValidateSpawnMetadata(const EnemySpawn& _spawn)
 	{
-		if (static_cast<unsigned>(_spawn.MyTag) > static_cast<unsigned>(EnemySpawnTag::BOUNTY))
+		if (static_cast<unsigned>(_spawn.MyTag) > static_cast<unsigned>(EnemySpawnTag::DUCK))
 			throw std::invalid_argument("invalid enemy spawn tag");
 		if (_spawn.MyBounty && (!std::isfinite(_spawn.MyBounty->MyCoins) || std::isless(_spawn.MyBounty->MyCoins, 0)))
 			throw std::invalid_argument("invalid bounty reward");

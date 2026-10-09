@@ -1,7 +1,7 @@
 """Compile chess loadouts and token owner/skill/module variants into immutable C++ records.
 
 Port of shared/loadoutRecord.js and sim/simdata.js for the pinned generated data shape.
-Only data is read; no JavaScript execution or text-to-code skill inference is involved.
+Only data is read; generic skill inference is compiled into typed static records.
 """
 import argparse
 import hashlib
@@ -11,6 +11,8 @@ import re
 from pathlib import Path
 from generate_combat import Tables, quote, number, boolean, record
 from generate_profession import profile, traits
+from generate_generic_skill import build_generic_skill, build_generic_talents
+from generate_operator_kits import build_operator_kit
 
 
 class AllyTables(Tables):
@@ -192,7 +194,10 @@ def body(tables, key, raw, token=False, abnormal=(), selection=None):
         MyStartingFlags=flags(starting), MyWithdrawDuration=number(raw_skill.get('duration', 0)) if raw_skill.get('skillId','').startswith('skcom_withdraw') else '{}',
         MyBaseAttack=profile(raw,token), MyTraitFrontRange=tables.grid(trait.get('rangeGrid') if isinstance(trait,dict) else None),
         MyHasTraitFrontRange=boolean(isinstance(trait,dict) and trait.get('rangeGrid') is not None), MyProfessionTraits=traits(raw, doll_health(tables,key,raw,selection) if not token else 1),
-        MyPreparationPlacement='PlacementClass::'+preparation_placement(raw), MyPreparationRange=tables.grid(preparation_range(raw)))
+        MyPreparationPlacement='PlacementClass::'+preparation_placement(raw), MyPreparationRange=tables.grid(preparation_range(raw)),
+        MyGenericSkill=build_generic_skill(tables, raw, damage, token), MyGenericTalents=build_generic_talents(tables, raw.get('talents')),
+        MyOperatorKit=build_operator_kit(tables, key, raw, token), MyOperatorProfession='OperatorProfession::'+
+            (raw['profession'].upper() if (raw.get('profession') or '').upper() in {'PIONEER','WARRIOR','TANK','SNIPER','CASTER','MEDIC','SUPPORT','SPECIAL'} else 'NONE'))
 
 
 def operator(tables, key, raw, backups, chess):

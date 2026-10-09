@@ -79,7 +79,7 @@ namespace Stronghold
 		// 切换动画的免控是职业规则，即使强制施加也拒绝；无需分配自定义监听器。
 		if (target.MyProfession.MyDollSwitching && (_status == CombatStatus::STUN ||
 			_status == CombatStatus::FREEZE || _status == CombatStatus::SLEEP)) return false;
-		if (!_MyContentInstances.empty())
+		if (!_MyContentInstances.empty() || _MyEquipmentStatusEffects)
 		{
 			ContentEvent event{.MyKind = ContentEventKind::BEFORE_STATUS, .MySource = application.MySource,
 				.MyTarget = _target, .MyStatus = _status, .MyApplication = application};
@@ -110,6 +110,10 @@ namespace Stronghold
 		auto& oldValue = statuses.MyValues[index];
 		auto& oldStrength = statuses.MyStrengths[index];
 		auto& tail = statuses.MyTails[index];
+		const bool entered = application.MyReenter || (!(remaining > 0) && !std::ranges::any_of(target.MyBuffs, [&](const CombatBuff& buff)
+		{
+			return buff.MyDefinition.MyStatus == _status;
+		}));
 		const auto value = application.MyValue.value_or(DefaultValue(_status));
 		const auto strength = std::abs(application.MyStackAs.value_or(value));
 		if (Valued(_status) && std::isgreater(remaining, 0))
@@ -159,7 +163,7 @@ namespace Stronghold
 		Recalculate(target);
 		Emit(BattleEventKind::STATUS_APPLIED, application.MySource, _target, duration, _status);
 		ContentEvent event{.MyKind = ContentEventKind::STATUS_APPLIED, .MySource = application.MySource,
-			.MyTarget = _target, .MyAmount = duration, .MyStatus = _status, .MyApplication = application};
+			.MyTarget = _target, .MyAmount = duration, .MyStatus = _status, .MyApplication = application, .MyStatusEntered = entered};
 		NotifyContent(event);
 		return true;
 	}

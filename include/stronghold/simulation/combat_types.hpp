@@ -1,6 +1,11 @@
 #ifndef STRONGHOLD_SIMULATION_COMBAT_TYPES_HPP
 #define STRONGHOLD_SIMULATION_COMBAT_TYPES_HPP
+#include <stronghold/simulation/bond_effects.hpp>
+#include <stronghold/simulation/garrison_effects.hpp>
+#include <stronghold/simulation/band_effects.hpp>
+#include <stronghold/simulation/equipment_effects.hpp>
 #include <stronghold/simulation/choice_effects.hpp>
+#include <stronghold/simulation/operator_kits.hpp>
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -203,6 +208,7 @@ namespace Stronghold
 		std::optional<double> MyStackAs{};
 		bool MyForce{};
 		bool MyResistApplied{};
+		bool MyReenter{};
 		std::optional<WorldPoint> MyPoint{};
 	};
 
@@ -246,7 +252,7 @@ namespace Stronghold
 	};
 
 	// 静态位标记让内置与自定义效果区分环境/持续伤害，不在伤害热路径比较字符串。
-	enum class DamageTag : std::uint32_t { TERRAIN = 1, DOT = 2, PERIODIC = 4, DEEPSEA = 8, TALENT = 16, AFTERSHOCK = 32, HP_LOSS = 64 };
+	enum class DamageTag : std::uint32_t { TERRAIN = 1, DOT = 2, PERIODIC = 4, DEEPSEA = 8, TALENT = 16, AFTERSHOCK = 32, HP_LOSS = 64, ITEM = 128, STEAD_SHARE = 256, STEAD_THORN = 512, BOND = 1024, ADDITION = 2048, SKILL = 4096, BURST = 8192, COUNTER = 16384, REFLECT = 32768, CHAIN = 65536, ZONE = 131072, NECROSIS = 262144, APOPTOSIS = 524288 };
 	using DamageTags = std::uint32_t;
 	[[nodiscard]] constexpr DamageTags operator|(DamageTag _left, DamageTag _right) noexcept
 	{ return static_cast<DamageTags>(_left) | static_cast<DamageTags>(_right); }
@@ -273,6 +279,10 @@ namespace Stronghold
 		bool MyIsAttack{};
 		UnitId MyTraitAlly{}; // 咒愈师的指定治疗对象；零表示选范围内生命比例最低者。
 		bool MySilent{};
+		double MySteadCut{};
+		bool MyIsSplash{};
+		bool MyIsSkill{};
+		bool MySunbrProc{}; // 同一次伤害的攻击前抽签结果；闪避／取消不会进入命中后的眩晕。
 	};
 
 	// 再生绕过治疗倍率和禁疗（healFree），但仍通知回调；溢出盾上限为目标当前最大生命。
@@ -317,6 +327,7 @@ namespace Stronghold
 		bool MyHitSleep{};
 		bool MyIgnoreSelect{};
 		bool MySourceless{};
+		DamageTags MyTags{};
 	};
 
 	struct ElementState
@@ -334,7 +345,23 @@ namespace Stronghold
 	};
 
 	// 内置到期行为静态分派；自定义 Buff 仍只通过 CUSTOM_BUFF 扩展。
-	enum class BuiltinBuff { NONE, DOLL_SWITCH, DOLL_FORM };
+	enum class BuiltinBuff { NONE, DOLL_SWITCH, DOLL_FORM, SARGON_STACK, SIRACUSA_STEALTH };
+
+	struct BuffStrengthTail
+	{
+		double MyValue{};
+		double MyUntil{};
+	};
+
+	struct BuffStrength
+	{
+		double MyValue{};
+		Attribute MyAttribute{};
+		double MyScale{1};
+		double MyOffset{};
+		std::optional<BuffStrengthTail> MyTail{};
+		std::optional<Attribute> MySecondAttribute{}; // 庇护等同一强度同时作用于两个属性，共用到期和较弱尾段。
+	};
 
 	struct BuffDefinition
 	{
@@ -357,6 +384,9 @@ namespace Stronghold
 		std::optional<double> MyStealthRestore{};
 		BuiltinBuff MyBuiltin{};
 		bool MyAllowDead{}; // 战斗开始的再部署修正等效果可显式作用于退场单位。
+		std::optional<BuffStrength> MyStrength{};
+		bool MyNotifyTick{}; // 内置内容显式订阅此 Buff 的 interval；普通 Buff 不广播周期事件。
+		std::optional<CombatStatus> MyStatus{}; // 状态来源 Buff 可由替身切换清除；普通属性增益保留。
 	};
 
 	struct CombatBuff
@@ -457,6 +487,7 @@ namespace Stronghold
 		double MyHealHpAtMost{1};
 		std::optional<CombatStatus> MyOnHitStatus{};
 		StatusApplication MyOnHitApplication{};
+		bool MyGenericHit{}; // 随攻击配置保存到弹道；瞬发技能结束后仍执行该次命中回调。
 		bool MyOnlyDuringSkill{}; // 解放者／阵法术师等：技力照常恢复，技能外不普攻。
 		bool MyHitAllBlocked{}; // 强攻手等的目标上限取当前阻挡数，至少为一。
 		AttackScaling MyScaling{};
@@ -465,6 +496,7 @@ namespace Stronghold
 		double MyHealNearDistance{2};
 		bool MyBoomerang{};
 		bool MyFortress{};
+		bool MySkillDamage{};
 	};
 
 	// 技能状态机是普通值类型；内置逻辑不经过注册表或虚函数。
@@ -499,7 +531,55 @@ namespace Stronghold
 		StatusFlags MyFlags{};
 	};
 
-	// 来源单位为零时使用绝对格掩码；否则实时读取该友军当前射程，离场／隐藏时不生效。
+	struct GenericStatusEffect
+	{
+		CombatStatus MyStatus{};
+		double MyDuration{};
+	};
+
+	// BUILT_IN 通用技能的构建期规则；借用的字符串和 spans 必须覆盖战场生命周期。
+	struct GenericSkillEffects
+	{
+		std::string_view MyDebuffKey{};
+		std::string_view MyShieldKey{};
+		std::span<const GenericStatusEffect> MyHitStatuses{};
+		std::span<const GenericStatusEffect> MyStartStatuses{};
+		std::span<const AttributeChange> MyDebuff{};
+		double MyProbability{1};
+		double MySelfStun{};
+		std::optional<Element> MyElement{};
+		double MyElementRatio{};
+		bool MyElementOfDamage{};
+		bool MyHitElement{};
+		std::optional<double> MyForce{};
+		bool MyPull{};
+		bool MyDirectional{};
+		bool MyEffectPush{};
+		double MyHealAlly{};
+		bool MyHealOthersOnly{};
+		bool MyHealAll{};
+		double MyDebuffDuration{};
+		bool MyAura{};
+		double MyDp{};
+		double MyLoseHp{};
+		double MyHealHp{};
+		double MyShield{};
+		double MyShieldDuration{};
+		bool MyShieldDecay{};
+		double MyStartBurst{};
+		double MyEndBurst{};
+		std::optional<DamageType> MyBurstType{};
+		unsigned MyStartTargets{};
+		bool MyCounter{};
+		double MyCounterScale{};
+		bool MyCounterDefense{};
+		DamageType MyCounterType{};
+		bool MyCounterAround{};
+		bool MyCounterGroundOnly{};
+		double MyCounterCooldown{};
+	};
+
+	// 来源单位为零时使用绝对格掩码；否则读取该友军按开局位置模式计算的射程，离场／隐藏时不生效。
 	// 只保存稳定 ID 和固定大小掩码，不为召唤物范围注册捕获 this 的函数对象。
 	struct SkillTriggerArea
 	{
@@ -539,6 +619,40 @@ namespace Stronghold
 		return _kind == SkillKind::DURATION || _kind == SkillKind::AMMO || _kind == SkillKind::TOGGLE;
 	}
 
+	struct UnitContentIdentity
+	{
+		std::string MyBaseChess{};
+		unsigned MyTier{1};
+		bool MyGolden{};
+		bool MyMeleePosition{true};
+		std::vector<std::string> MyBonds{};
+		std::vector<std::string> MyItems{};
+		std::vector<std::string> MyGarrisons{};
+	};
+
+	// 医疗内容的数值在适配阶段解析；治疗与倒地事件只读取固定参数。
+	struct MedicKitDefinition
+	{
+		double MyHealSp{};
+		double MyDeathSp{};
+		double MySkillHpRatio{};
+		double MySkillHealMultiplier{1};
+		double MySkillExtraHeal{};
+	};
+
+	struct YanyouKitDefinition
+	{
+		double MyRangeRadius{2};
+		double MyMoveSpeed{0.5};
+		double MyBurnRatio{};
+		double MyFragileMultiplier{1};
+		unsigned MyDeployLimit{2};
+		double MyFlameScale{};
+		double MyFlameRadius{};
+	};
+
+	enum class OperatorProfession { NONE, PIONEER, WARRIOR, TANK, SNIPER, CASTER, MEDIC, SUPPORT, SPECIAL };
+
 	struct CombatDefinition
 	{
 		std::string MyId{};
@@ -560,6 +674,35 @@ namespace Stronghold
 		std::optional<HitArea> MyHitArea{};
 		std::optional<std::vector<RangeOffset>> MyTraitFrontRange{}; // 缺省用朝向的正前方整行；空表表示无强化格。
 		ProfessionDefinition MyProfession{};
+		UnitContentIdentity MyIdentity{};
+		std::vector<BuffDefinition> MyInitialBuffs{};
+		std::optional<MedicKitDefinition> MyMedic{};
+		std::optional<YanyouKitDefinition> MyYanyou{};
+		std::vector<EquipmentEffect> MyEquipmentEffects{};
+		std::vector<std::string> MyEnemyTags{};
+		const GenericSkillEffects* MyGenericSkill{};
+		const OperatorKitDefinition* MyOperatorKit{};
+		OperatorProfession MyOperatorProfession{};
+	};
+
+	struct MapCharacterTile
+	{
+		FieldPoint MyPosition{};
+		Facing MyFacing{Facing::RIGHT};
+		bool MyMultiOnly{};
+	};
+
+	struct MapCharacterDefinition
+	{
+		CombatDefinition MyDefinition{};
+		std::vector<MapCharacterTile> MyPositions{};
+	};
+
+	struct MapCharacterVariant
+	{
+		unsigned MyMinimumElites{};
+		unsigned MyMaximumElites{std::numeric_limits<unsigned>::max()};
+		std::vector<MapCharacterDefinition> MyCharacters{};
 	};
 
 	// The route adapter supplies resolved waypoints. This engine does not invent paths through terrain.
@@ -625,10 +768,14 @@ namespace Stronghold
 		std::vector<BondLayer> MyBonds{};
 		std::optional<bool> MyRightHalf{}; // 联防右半场不镜像部署；未指定时沿用镜像标志。
 		std::vector<BattleChoiceEffect> MyChoiceEffects{};
+		std::vector<BattleBandEffect> MyBandEffects{};
+		std::vector<AddonBondEffect> MyAddonBonds{};
+		std::vector<CoreBondEffect> MyCoreBonds{};
+		std::uint64_t MyGainedChess{}; // 当前准备回合获得干员数；天师古鼎等内容使用。
 		std::optional<std::size_t> MyHandUnits{}; // 无显式准备条件时，旧输入可提供手牌数量回退。
 	};
 
-	enum class EnemySpawnTag { NONE, BOSS, PART, BOUNTY };
+	enum class EnemySpawnTag { NONE, BOSS, PART, BOUNTY, DUCK };
 
 	// 已施加到基础定义的出生修正原样保存，供漏怪重建和频次敌人读取；不会在核心内重复乘算。
 	struct EnemySpawnModifiers
@@ -739,13 +886,16 @@ namespace Stronghold
 		bool MyOwnerOnly{};
 	};
 
-	enum class RemovalReason { KILLED, RETREAT, EXPIRED, LEAK, REMOVED, FORCED_EXIT, MERCHANT };
+	enum class RemovalReason { KILLED, RETREAT, EXPIRED, LEAK, REMOVED, FORCED_EXIT, MERCHANT, RAID };
 
 	struct ContentBinding
 	{
 		ContentReference MyContent{};
 		std::string MyPlayerId{};
 	};
+
+	// 仅改变友军的盟约／战斗特质和技能位置判定；敌人的路线位置始终实时。
+	enum class RulePositionMode { CURRENT, INITIAL };
 
 	struct BattleInput
 	{
@@ -774,6 +924,16 @@ namespace Stronghold
 		// 每次命中和漏怪立即通知，不能等 DrainEvents 后再决定胜负，否则同帧先后顺序会丢失。
 		std::optional<std::reference_wrapper<FinalAssault>> MyFinalAssault{};
 		std::optional<bool> MyLayerGainsEnabled{}; // 缺省普通战斗开启、首领战关闭；联防输入应显式关闭。
+		// 构建期生成且按 ID 排序的装备目录；借用者保证目录及其 spans 比本局活得更久。
+		std::span<const EquipmentTemplate> MyEquipmentTemplates{};
+		// 按 ID 排序的静态特质表及盟约原始顺序；宿主保证其 spans 比本局活得更久。
+		BattleGarrisonRules MyGarrisonRules{};
+		std::optional<CombatDefinition> MyYanyouDefinition{};
+		std::vector<FieldPoint> MyMapCharacterTiles{}; // 原地图全部医疗预留位置，即使当前没有外勤医疗战略。
+		std::vector<MapCharacterVariant> MyMapCharacters{}; // 对所有参战玩家生效，按开战时仍在场的精锐数量选首个变体。
+		RulePositionMode MyRulePositionMode{RulePositionMode::CURRENT};
+		bool MyGarrisonEffectsAfterExit{}; // 退场后继续提供依赖来源在场的战斗特质；未部署单位不因此激活。
+		bool MyRetainGrantedGarrisonsAfterExit{true}; // 接受者退场后保留获授特质；关闭则本场移除，不因重部署恢复。
 	};
 
 	struct UnitCombatTotals
@@ -817,6 +977,12 @@ namespace Stronghold
 		CombatDefinition MyDefinition{};
 		WorldPoint MyPosition{};
 		WorldPoint MyHome{};
+		double MyGenericCounterReadyAt{-std::numeric_limits<double>::infinity()};
+		std::uint64_t MyGenericShieldBuff{};
+		double MyGenericShieldLoss{};
+		unsigned MyTinmanZones{};
+		std::uint64_t MyTinmanZoneSequence{};
+		double MyIndigoAccumulator{};
 		Facing MyFacing{Facing::RIGHT};
 		bool MyGround{true};
 		bool MyGroundPassable{true};
@@ -832,13 +998,25 @@ namespace Stronghold
 		UnitId MyBlockedBy{};
 		std::vector<UnitId> MyBlocking{};
 		std::uint64_t MyDeploySequence{}; // 一次部署的身份，用于弹道和内容生命周期判断。
+		double MyDeployedAt{};
+		bool MyIndomitableFree{};
+		bool MyEliteSpCostApplied{};
+		double MyIndomitableAt{-std::numeric_limits<double>::infinity()};
+		double MySteadThornAt{-std::numeric_limits<double>::infinity()};
+		double MySiracusaStealthEnd{std::numeric_limits<double>::infinity()};
 		std::uint64_t MyAggroSequence{}; // 初始召唤物在所有干员之后；不改变部署身份。
 		std::uint64_t MySpawnSequence{};
 		std::size_t MySpawnIndex{};
 		std::size_t MyRouteIndex{};
 		std::optional<double> MyWaitLeft{};
 		std::vector<Shield> MyShields{};
+		std::size_t MyYanyouIndex{std::numeric_limits<std::size_t>::max()};
+		std::uint64_t MyRangeRevision{};
 		std::bitset<399> MyRangeMask{};
+		std::vector<int> MyRangeKeys{}; // 保留数据格子顺序，随机选敌不得按单位出生顺序替代。
+		std::bitset<FieldTiles> MyInitialRuleRangeMask{};
+		std::vector<int> MyInitialRuleRangeKeys{}; // 仅初始位置模式构建，不能平移已被地图边界裁切的实时范围。
+		std::bitset<FieldTiles> MyBaseTriggerMask{};
 		CombatStats MyStats{};
 		std::vector<CombatBuff> MyBuffs{};
 		double MyRegenAccumulator{};
@@ -847,7 +1025,9 @@ namespace Stronghold
 		SkillState MySkill{};
 		std::bitset<399> MyBaseRangeMask{};
 		std::bitset<FieldTiles> MyTraitFrontMask{};
+		std::bitset<FieldTiles> MyInitialTraitFrontMask{};
 		ProfessionState MyProfession{};
+		double MyLastRaidAt{-std::numeric_limits<double>::infinity()};
 		double MyLastAttackAt{-std::numeric_limits<double>::infinity()};
 		ElementState MyElements{};
 		std::vector<WorldPoint> MyPath{};
@@ -867,6 +1047,8 @@ namespace Stronghold
 		TerrainState MyTerrainState{};
 		std::optional<CarryState> MyCarry{};
 		bool MyDeferred{};
+		std::uint64_t MyMedicExtraAttack{std::numeric_limits<std::uint64_t>::max()};
+		double MySolventAt{-std::numeric_limits<double>::infinity()};
 
 		[[nodiscard]] bool Flying() const noexcept
 		{

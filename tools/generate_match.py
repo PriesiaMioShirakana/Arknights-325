@@ -41,6 +41,9 @@ def main():
     modes=[]
     for key,m in sorted(config['modes'].items()):
         solo=m.get('type')=='SINGLE' or key.startswith('mode_single_');difficulty=m.get('difficulty') or key.split('_')[-1].upper()
+        ban_defaults = {'FUNNY': (0, 1), 'NORMAL': (3, 4), 'HARD': (3, 4), 'ABYSS': (3, 4)}.get(difficulty, (0, 0))
+        bans = (config.get('bans') or {}).get(difficulty) or {}
+        dp = config.get('dp') or {}
         last=integer(m.get('lastRound'),9 if key=='mode_single_funny' else 14);boss_round=integer(m.get('bossRound'),last);hidden=integer(m.get('hiddenRound'),0)
         rounds=[]
         for r,c in sorted((m.get('rounds') or {}).items(),key=lambda x:int(x[0])):
@@ -67,7 +70,11 @@ def main():
             MyInactiveBonds=strings(m.get('inactiveBondIds') or []),MyBossScale=scale(m.get('bossHpScale')),MyGlobalBossScale=scale(config.get('bossHpScale')),
             MyFinalAssault=final,MySpecialDraft=record('SpecialDraftRules',MySolo=boolean(solo),MyFirstTurnSeconds=number(timer('spFirst',30)),MyTurnSeconds=number(timer('spTurn',16))),
             MyInformationSeconds=number(timer('infoCheck',25)),MyBattleCheckSeconds=number(timer('battleCheck',3)),MyStrategyTurnSeconds=number(timer('bandTurn',30)),
-            MyStrategySkips=str(integer(bd.get('skipsPerPlayer'),1,0)),MyDefaultStrategy=quote(default_band),MyLifeCapPerRound=str(integer(config.get('lpCapPerRound'),10))))
+            MyStrategySkips=str(integer(bd.get('skipsPerPlayer'),1,0)),MyDefaultStrategy=quote(default_band),MyLifeCapPerRound=str(integer(config.get('lpCapPerRound'),10)),
+            MyDisabledCoreBonds=str(integer(bans.get('core'),ban_defaults[0],0)),MyDisabledAddonBonds=str(integer(bans.get('addon'),ban_defaults[1],0)),
+            MyMaxUniteHelpers=str(integer((config.get('unite') or {}).get('maxHelpers'),2)),
+            MyInitialDp=number(dp['init'] if finite(dp.get('init')) else 10),MyDpPerSecond=number(dp['perSec'] if finite(dp.get('perSec')) else 1),
+            MyMaxDp=number(dp['max'] if finite(dp.get('max')) else 99)))
     span=tables.array('MatchRules',modes)
     fingerprints=[f'// {k}.json SHA-256 {hashlib.sha256((args.data/(k+".json")).read_bytes()).hexdigest()}' for k in raw]
     args.out.parent.mkdir(parents=True,exist_ok=True)

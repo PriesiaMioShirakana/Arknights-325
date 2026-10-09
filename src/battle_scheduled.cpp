@@ -75,6 +75,94 @@ namespace Stronghold
 			if (Finished()) break;
 			switch (action.MyKind)
 			{
+			case ScheduledKind::TINMAN_ZONE:
+				TinmanZonePulse(action.MySource, action.MyPoint, action.MyAmount, action.MyHandle, action.MyVersion % 4 == 0);
+				++action.MyVersion;
+				action.MyAt += action.MyInterval;
+				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
+				if (--action.MyRemaining)
+				{
+					if (!Finished()) Schedule(action);
+				}
+				else --_MyUnits[Index(action.MySource)].MyTinmanZones;
+				break;
+			case ScheduledKind::PODEGO_AURA:
+				PodegoAura(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::PODEGO_ZONE:
+				PodegoZonePulse(action.MySource, action.MyPoint, action.MyAmount);
+				action.MyAt += action.MyInterval;
+				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
+				if (--action.MyRemaining && !Finished()) Schedule(action);
+				break;
+			case ScheduledKind::INSIDER_AMMO:
+				GrantInsiderAmmo(action.MySource, action.MyVersion);
+				break;
+			case ScheduledKind::OPERATOR_REVEAL:
+				OperatorReveal(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::GARRISON_REFRESH:
+				_MyGarrisonPending = false; RefreshGarrisons();
+				break;
+			case ScheduledKind::CORE_BOND_REFRESH:
+				_MyCoreBonds[static_cast<std::size_t>(action.MyHandle)].MyPending = false;
+				RefreshCoreBond(static_cast<std::size_t>(action.MyHandle));
+				break;
+			case ScheduledKind::CORE_BOND_PULSE:
+				CoreBondPulse(static_cast<std::size_t>(action.MyHandle));
+				action.MyAt += action.MyInterval;
+				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
+				if (!Finished()) Schedule(action);
+				break;
+			case ScheduledKind::BOND_REFRESH:
+				_MyAddonBonds[static_cast<std::size_t>(action.MyHandle)].MyPending = false;
+				RefreshAddonBonds(static_cast<std::size_t>(action.MyHandle));
+				UpdateBondAura(static_cast<std::size_t>(action.MyHandle));
+				break;
+			case ScheduledKind::BOND_AURA:
+			case ScheduledKind::BOND_RAID:
+				for (std::size_t i = 0; i < _MyAddonBonds.size(); ++i)
+					if (action.MyKind == ScheduledKind::BOND_AURA) UpdateBondAura(i); else PollRaidBond(i);
+				action.MyAt += 0.25;
+				if (action.MyAt <= now) action.MyAt = Time() + 0.25;
+				if (!Finished()) Schedule(action);
+				break;
+			case ScheduledKind::EQUIPMENT_EXPIRE:
+				if (_MyEquipmentLends[static_cast<std::size_t>(action.MyHandle)].MyVersion == action.MyVersion)
+					ExpireEquipmentLend(static_cast<std::size_t>(action.MyHandle));
+				break;
+			case ScheduledKind::HAMMER:
+			{
+				auto& hammer = _MyHammers[static_cast<std::size_t>(action.MyHandle)];
+				if (Unit(action.MySource).MyRemoved || !hammer.MyReferences || hammer.MyGeneration != action.MyVersion) break;
+				RefreshHammer(hammer);
+				action.MyAt += 0.5;
+				if (action.MyAt <= now) action.MyAt = Time() + 0.5;
+				if (!Finished()) Schedule(action);
+				break;
+			}
+			case ScheduledKind::EQUIPMENT_RETREAT:
+				if (Unit(action.MySource).MyAlive) (void)Retreat(action.MySource, false, RemovalReason::RETREAT, true);
+				break;
+			case ScheduledKind::EQUIPMENT:
+			{
+				if (Unit(action.MySource).MyRemoved || !EquipmentActive(_MyEquipment[static_cast<std::size_t>(action.MyHandle)])) break;
+				unsigned catches = 0;
+				while (action.MyAt <= now && !Finished() && catches++ < 8)
+				{
+					EquipmentPeriodic(static_cast<std::size_t>(action.MyHandle));
+					action.MyAt += action.MyInterval;
+				}
+				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			}
 			case ScheduledKind::AFTERSHOCK:
 				Aftershock(action.MySource, action.MyPoint);
 				break;

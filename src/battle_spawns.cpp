@@ -52,6 +52,8 @@ namespace Stronghold
 		_MyAllyIds.emplace_back(unit.MyId);
 		AttachContent(unit.MyDefinition.MyContent, unit.MyId, 0, owner);
 		InstallProfession(unit);
+		InstallOperatorKit(unit);
+		InstallUnitEffects(unit);
 		if (_spawn.MyUntargetable)
 		{
 			StatusFlags flags;
@@ -181,12 +183,12 @@ namespace Stronghold
 		return CreateEnemy(stored, index);
 	}
 
-	void Battle::Retreat(UnitId _unit, bool _permanent, RemovalReason _reason)
+	void Battle::Retreat(UnitId _unit, bool _permanent, RemovalReason _reason, bool _dying)
 	{
 		auto& unit = _MyUnits[Index(_unit)];
-		if (_reason != RemovalReason::RETREAT && _reason != RemovalReason::EXPIRED && _reason != RemovalReason::MERCHANT) throw std::invalid_argument("invalid retreat reason");
+		if (_reason != RemovalReason::RETREAT && _reason != RemovalReason::EXPIRED && _reason != RemovalReason::MERCHANT && _reason != RemovalReason::RAID) throw std::invalid_argument("invalid retreat reason");
 		if (!_MyStarted || Finished() || !unit.MyAlive || unit.MySide != UnitSide::ALLY) return;
-		RemoveUnit(unit, _reason, 0, _permanent);
+		RemoveUnit(unit, _reason, 0, _permanent, _dying);
 	}
 
 	bool Battle::Redeploy(UnitId _unit, bool _free, std::optional<WorldPoint> _tile, bool _keepSp)
@@ -205,7 +207,7 @@ namespace Stronghold
 		return true;
 	}
 
-	void Battle::RemoveUnit(CombatUnit& _unit, RemovalReason _reason, UnitId _source, bool _permanent)
+	void Battle::RemoveUnit(CombatUnit& _unit, RemovalReason _reason, UnitId _source, bool _permanent, bool _dying)
 	{
 		_unit.MyAlive = false;
 		_unit.MyRemovalReason = _reason;
@@ -227,7 +229,7 @@ namespace Stronghold
 			if (_unit.MyKind == UnitKind::OPERATOR && !_permanent)
 			{
 				_unit.MyRespawnAt = Time() + std::max(0.0, _unit.MyStats.MyRedeploySeconds * _unit.MyStats.MyRedeployMultiplier);
-				LayBody(_unit);
+				if (IsDown(_unit.MyId)) LayBody(_unit);
 				if (_reason == RemovalReason::KILLED) ++_MyPlayers[_unit.MyOwner].MyDeaths;
 			}
 			else _unit.MyRemoved = true;
@@ -246,8 +248,11 @@ namespace Stronghold
 			}
 		}
 		if (_reason != RemovalReason::LEAK) Emit(BattleEventKind::DIED, _source, _unit.MyId);
-		ContentEvent event{.MyKind = ContentEventKind::DEATH, .MyUnit = _unit.MyId, .MySource = _source, .MyTarget = _unit.MyId, .MyRemovalReason = _reason};
+		ContentEvent event{.MyKind = ContentEventKind::DEATH, .MyUnit = _unit.MyId, .MySource = _source, .MyTarget = _unit.MyId, .MyRemovalReason = _reason, .MyDying = _dying};
 		NotifyContent(event);
+		// 本次退场事件先结算；关闭保留时，获授特质及其属性不会带入下一次部署。
+		if (RevokeGrantedGarrisons(_unit.MyId) && _unit.MyKind == UnitKind::OPERATOR && !_unit.MyAlive && !_unit.MyRemoved)
+			_unit.MyRespawnAt = _unit.MyRemovedAt + std::max(0.0, _unit.MyStats.MyRedeploySeconds * _unit.MyStats.MyRedeployMultiplier);
 		if (_unit.MyRemoved && !_unit.MyAlive && _reason != RemovalReason::LEAK)
 		{
 			RetireContent(_unit.MyId, 0);

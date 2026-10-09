@@ -77,5 +77,7 @@ namespace Stronghold
 		_input.MyField = std::move(setup.MyField);
 		_input.MyDevices = std::move(setup.MyDevices);
 		_input.MyTurrets = std::move(setup.MyTurrets);
+		_input.MyMapCharacterTiles.clear(); _input.MyMapCharacterTiles.reserve(MyMapCharacters.size());
+		for (const auto& character : MyMapCharacters) _input.MyMapCharacterTiles.push_back(character.MyTile.MyPosition);
 	}
 }

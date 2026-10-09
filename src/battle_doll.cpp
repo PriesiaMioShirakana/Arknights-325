@@ -7,6 +7,9 @@ namespace Stronghold
 		if (_unit.MySkill.MyActive && _unit.MyDefinition.MySkill.MyKind != SkillKind::PASSIVE)
 			EndSkill(_unit.MyId, SkillReason::SUBSTITUTE);
 		// 原版“清除 Buff”仅清状态及当前技能；普通属性增益、外部治疗与护盾不在此处驱散。
+		std::vector<std::uint64_t> statusBuffs; statusBuffs.reserve(_unit.MyBuffs.size());
+		for (const auto& buff : _unit.MyBuffs) if (buff.MyDefinition.MyStatus) statusBuffs.push_back(buff.MyId);
+		for (const auto id : statusBuffs) (void)RemoveBuff(_unit.MyId, id);
 		for (std::size_t i = 0; i < static_cast<std::size_t>(CombatStatus::COUNT); ++i)
 			(void)RemoveStatus(_unit.MyId, static_cast<CombatStatus>(i));
 		_unit.MyProfession.MyDollSwitching = true;

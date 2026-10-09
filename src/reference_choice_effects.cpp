@@ -2,6 +2,14 @@
 
 namespace Stronghold
 {
+	std::vector<BattleBandEffect> MakeBandBattleEffects(std::string_view _strategy)
+	{
+		std::vector<BattleBandEffect> result;
+		for (const auto& rule : ReferenceBandBattleRules())
+			if (rule.MyId == _strategy) result.push_back({"band:" + std::string(_strategy), std::string(rule.MyBond), rule.MyParameters});
+		return result;
+	}
+
 	std::vector<BattleChoiceEffect> MakeChoiceBattleEffects(const ChoiceRewardView& _view)
 	{
 		std::vector<BattleChoiceEffect> result; result.reserve(_view.MyBattleEffects.size());

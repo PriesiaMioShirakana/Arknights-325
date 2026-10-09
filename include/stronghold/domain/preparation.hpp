@@ -8,6 +8,8 @@
 
 namespace Stronghold
 {
+	struct PreparationHooks;
+
 	using PieceUid = std::uint64_t;
 
 	struct Piece
@@ -210,6 +212,13 @@ namespace Stronghold
 		std::optional<PieceUid> MyReplace{};
 	};
 
+	struct UseArt
+	{
+		PieceUid MyItem{};
+		BoardPosition MyPosition;
+		Facing MyFacing{Facing::RIGHT};
+	};
+
 	struct GrantOptions
 	{
 		bool MyFromPool{true};
@@ -234,7 +243,7 @@ namespace Stronghold
 		GrantPurchaseUpgrade, KeepRemainingFunds, RaiseDeployCap>;
 
 	using PreparationCommand =
-		std::variant<Buy, Refresh, Freeze, LevelUp, Sell, DestroyItem, SetReady, PickReward, MoveToBoard, MoveToHand, EquipItem>;
+		std::variant<Buy, Refresh, Freeze, LevelUp, Sell, DestroyItem, SetReady, PickReward, MoveToBoard, MoveToHand, EquipItem, UseArt>;
 
 	struct CommandEnvelope
 	{
@@ -259,7 +268,8 @@ namespace Stronghold
 		EQUIPPED,
 		PROMOTED,
 		ITEM_UPGRADED,
-		ECONOMY_EFFECT
+		ECONOMY_EFFECT,
+		ART_USED
 	};
 
 	struct EconomyEvent
@@ -268,6 +278,7 @@ namespace Stronghold
 		std::string MyDefinitionId;
 		PieceUid MyUid{};
 		std::int64_t MyAmount{};
+		std::string MyPlayerId{}; // 跨玩家内容事件显式标记接收者；空值沿用命令所属玩家。
 	};
 
 	struct ChangeSet
@@ -359,9 +370,11 @@ namespace Stronghold
 
 	private:
 		friend class PreparationContent; // 跨玩家机变奖励使用同一经济事务与 UID 流。
+		friend struct PreparationHooks;
 		struct Player
 		{
 			PlayerView MyView;
+			int MySeat{};
 			std::size_t MyPool{};
 			ShopLayout MyLayout;
 			std::optional<std::reference_wrapper<const SummonCatalog>> MySummons{};
@@ -375,6 +388,8 @@ namespace Stronghold
 		void RollShop(Player& _player, bool _keepFrozen, bool _onlyNew = false);
 
 		std::optional<PieceUid> Acquire(Player& _player, const Definition& _definition, std::vector<EconomyEvent>& _events, GrantOptions _options = {});
+		[[nodiscard]] std::string GrantDefinition(PlayerView& _view, PieceUid _uid, std::string_view _fallback,
+			std::span<const EconomyEvent> _events) const;
 		std::optional<PieceUid> MergePieces(Player& _player, const Definition& _definition, std::optional<Piece> _incoming, std::vector<EconomyEvent>& _events);
 		void FillHand(PlayerView& _view) const;
 		void ResolveTemporary(Player& _player);
@@ -449,6 +464,7 @@ namespace Stronghold
 		PreparationPhase _MyPhase{PreparationPhase::IDLE};
 		PieceUid _MyNextUid{};
 		std::uint64_t _MyRevision{};
+		PreparationHooks* _MyHooks{}; // 仅内容事务的栈作用域内借用；Commit 不传播此指针。
 	};
 } // namespace Stronghold
 #endif

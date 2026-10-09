@@ -93,21 +93,24 @@ namespace Stronghold
 		if (!_MyStarted || Finished() || !unit.MyAlive) return false;
 		if (_targets.empty()) _targets = unit.MySide == UnitSide::ALLY ? AllyTargets(unit) : EnemyTargets(unit);
 		if (_targets.empty()) return false;
-		Attack(unit, _targets, _noAmmo);
-		return true;
+		return Attack(unit, _targets, _noAmmo);
 	}
 
-	void Battle::Attack(CombatUnit& _source, std::span<const UnitId> _targets, bool _noAmmo)
+	bool Battle::Attack(CombatUnit& _source, std::span<const UnitId> _targets, bool _noAmmo)
 	{
 		auto& scratch = AcquireAttackScratch();
 		const AttackGuard guard{.MyDepth = _MyAttackDepth};
-		for (const auto id : _targets) if (Unit(id).MyAlive) scratch.MyTargets.emplace_back(id);
-		if (scratch.MyTargets.empty()) return;
+		// 显式强制攻击仍消费攻击次数和弹药；目标刚被连锁效果击倒时，命中阶段自行跳过伤害。
+		scratch.MyTargets.assign(_targets.begin(), _targets.end());
+		if (scratch.MyTargets.empty() || !OperatorBeforeAttack(_source, scratch.MyTargets)) return false;
 		++_source.MyTotals.MyAttacks;
 		_source.MyLastAttackAt = Time();
 		auto profile = EffectiveAttack(_source);
+		const auto& skill = _source.MyDefinition.MySkill;
+		profile.MySkillDamage = _source.MySkill.MyActive && (skill.MyAttack || !skill.MyRange.empty() || skill.MyRangeExtend != 0 || skill.MyNoRangeExtend);
 		if (profile.MyFortress && _source.MyProfession.MyFortressMelee) profile.MyRanged = false;
 		const auto attackId = ++_MyAttackSequence;
+		const bool initialPosition = _source.MySkill.MyActive && UsesInitialPosition(_source);
 		const auto sourceLife = _source.MyDeploySequence;
 		const bool mystic = _source.MyDefinition.MyProfession.MyKind == ProfessionTrait::MYSTIC && !profile.MyHealing;
 		const auto energy = mystic ? std::exchange(_source.MyProfession.MyStored, 0U) : 0U;
@@ -135,13 +138,15 @@ namespace Stronghold
 				_MyProjectiles.emplace_back(Projectile{.MySource = _source.MyId, .MyTarget = id, .MyTargetLife = target.MyDeploySequence,
 					.MyPosition = _source.MyPosition, .MySpeed = profile.MyBoomerang ? 15.0 : speed, .MyProfile = hitProfile,
 					.MyDestination = target.MyPosition, .MySourceLife = sourceLife, .MyAttackId = attackId,
-					.MySkillAttack = _source.MySkill.MyActive && _source.MyDefinition.MySkill.MyKind != SkillKind::PASSIVE});
+					.MySkillAttack = _source.MySkill.MyActive && _source.MyDefinition.MySkill.MyKind != SkillKind::PASSIVE,
+					.MyInitialPositionAttack = initialPosition});
 			}
-			else Hit(_source.MyId, id, hitProfile);
+			else Hit(_source.MyId, id, hitProfile, {}, initialPosition);
 		}
-		if (!Finished()) SkillAttackPerformed(_source, usedOverride, _noAmmo, scratch.MyTargets.size());
+		if (!Finished()) SkillAttackPerformed(_source, usedOverride, _noAmmo, scratch.MyTargets);
 		if (_source.MyDefinition.MyProfession.MyKind == ProfessionTrait::HUNTER)
 			_source.MyProfession.MyAmmo = std::max(0.0, _source.MyProfession.MyAmmo - 1);
+		return true;
 	}
 
 	// 正前方判定使用身体占格；单点敌人的纵向位置仍用连续坐标，避免半格处提前切换倍率。
@@ -149,12 +154,14 @@ namespace Stronghold
 	double Battle::MainAttackMultiplier(
 		CombatUnit& _source,
 		const CombatUnit& _target,
-		const AttackProfile& _profile
+		const AttackProfile& _profile,
+		bool _initialPosition
 	) noexcept
 	{
 		const auto forward = RotateOffset(RangeOffset{.MyColumn = 1}, _source.MyFacing);
-		const auto row = static_cast<int>(std::floor(_source.MyPosition.MyY + 0.5));
-		const auto column = static_cast<int>(std::floor(_source.MyPosition.MyX + 0.5));
+		const auto origin = _initialPosition ? _source.MyHome : _source.MyPosition;
+		const auto row = static_cast<int>(std::floor(origin.MyY + 0.5));
+		const auto column = static_cast<int>(std::floor(origin.MyX + 0.5));
 		switch (_profile.MyScaling)
 		{
 		case AttackScaling::NONE: return 1;
@@ -177,14 +184,14 @@ namespace Stronghold
 			return _source.MyProfession.MyReinforcement && _target.MyBlockedBy == _source.MyProfession.MyReinforcement ? _profile.MyConditionalScale : 1;
 		case AttackScaling::FRONT:
 			if (_source.MyDefinition.MyTraitFrontRange)
-				return BodyInRange(_target, _source.MyTraitFrontMask) ? _profile.MyConditionalScale : 1;
+				return BodyInRange(_target, _initialPosition ? _source.MyInitialTraitFrontMask : _source.MyTraitFrontMask) ? _profile.MyConditionalScale : 1;
 			if (!_target.MyDefinition.MyHitArea)
 			{
 				const auto dy = std::floor(_target.MyPosition.MyY + 0.5) - row;
 				const auto dx = std::floor(_target.MyPosition.MyX + 0.5) - column;
 				return !std::islessgreater(dy * forward.MyColumn - dx * forward.MyRow, 0) &&
-					std::isgreaterequal((_target.MyPosition.MyX - _source.MyPosition.MyX) * forward.MyColumn +
-						(_target.MyPosition.MyY - _source.MyPosition.MyY) * forward.MyRow, 0) ? _profile.MyConditionalScale : 1;
+					std::isgreaterequal((_target.MyPosition.MyX - origin.MyX) * forward.MyColumn +
+						(_target.MyPosition.MyY - origin.MyY) * forward.MyRow, 0) ? _profile.MyConditionalScale : 1;
 			}
 			const auto tiles = BodyTiles(_target);
 			for (int r = tiles.MyFirstRow; r <= tiles.MyLastRow; ++r)
@@ -196,21 +203,22 @@ namespace Stronghold
 		return 1;
 	}
 
-	void Battle::Hit(UnitId _source, UnitId _target, const AttackProfile& _profile, WorldPoint _point)
+	void Battle::Hit(UnitId _source, UnitId _target, const AttackProfile& _profile, WorldPoint _point, bool _initialPosition)
 	{
 		auto& scratch = AcquireAttackScratch();
 		const AttackGuard guard{.MyDepth = _MyAttackDepth};
 		auto& source = _MyUnits[Index(_source)];
 		// 配置取发射时快照，ATK 取命中时值；同一次命中的多段／溅射／连锁共用该次 ATK。
 		const auto amount = source.MyStats.MyAttack * source.MyStats.MyAttackScaleMultiplier * _profile.MyAttackScale * _profile.MyDamageMultiplier;
+		double totalDealt = 0;
 		if (_target && Unit(_target).MyAlive)
 		{
 			double dealt = 0;
-			const auto mainAmount = amount * MainAttackMultiplier(source, Unit(_target), _profile);
+			const auto mainAmount = amount * MainAttackMultiplier(source, Unit(_target), _profile, _initialPosition);
 			for (unsigned hit = 0; hit < _profile.MyHits && Unit(_target).MyAlive && !Finished(); ++hit)
 				dealt += DealDamage(_source, _target, DamageInfo{.MyAmount = mainAmount, .MyType = _profile.MyDamageType,
 					.MyMultiplier = _profile.MyHitMultiplier.value_or(1), .MyHitSleep = _profile.MyHitSleep,
-					.MyNoSp = _profile.MyHitMultiplier.has_value() && hit != 0, .MyIsAttack = true});
+					.MyNoSp = _profile.MyHitMultiplier.has_value() && hit != 0, .MyIsAttack = true, .MyIsSkill = _profile.MySkillDamage});
 			if (_profile.MyOnHitStatus && Unit(_target).MyAlive)
 			{
 				auto application = _profile.MyOnHitApplication;
@@ -219,6 +227,7 @@ namespace Stronghold
 			}
 			ContentEvent event{.MyKind = ContentEventKind::ATTACK_HIT, .MySource = _source, .MyTarget = _target, .MyAmount = dealt};
 			NotifyContent(event);
+			totalDealt += dealt;
 			_point = Unit(_target).MyPosition;
 		}
 		if (std::isgreater(_profile.MySplashRadius, 0))
@@ -232,7 +241,8 @@ namespace Stronghold
 					target.MyStatuses.Has(CombatStatus::UNTARGETABLE) || (target.MySide == UnitSide::ENEMY && EnemyStealthed(target)) || (target.Flying() && (_profile.MyGroundOnly ||
 					(!_profile.MyCanHitFlying && !_profile.MySplashHitsFlying))) ||
 					std::isgreater(Distance(_point, target.MyPosition), _profile.MySplashRadius + 1e-9)) continue;
-				const auto dealt = DealDamage(_source, target.MyId, DamageInfo{.MyAmount = amount * _profile.MySplashScale, .MyType = _profile.MyDamageType, .MyIsAttack = true});
+				const auto dealt = DealDamage(_source, target.MyId, DamageInfo{.MyAmount = amount * _profile.MySplashScale, .MyType = _profile.MyDamageType, .MyIsAttack = true, .MyIsSplash = true, .MyIsSkill = _profile.MySkillDamage});
+				totalDealt += dealt;
 				ContentEvent event{.MyKind = ContentEventKind::ATTACK_HIT, .MySource = _source, .MyTarget = target.MyId, .MyAmount = dealt, .MySplash = true};
 				NotifyContent(event);
 			}
@@ -258,7 +268,9 @@ namespace Stronghold
 				if (!best) break;
 				scratch.MySeen.emplace_back(best);
 				Emit(BattleEventKind::ATTACKED, previous, best);
-				const auto dealt = DealDamage(_source, best, DamageInfo{.MyAmount = amount * std::pow(1 - _profile.MyChainFalloff, bounce), .MyType = _profile.MyDamageType, .MyIsAttack = true});
+				const auto dealt = DealDamage(_source, best, DamageInfo{.MyAmount = amount * std::pow(1 - _profile.MyChainFalloff, bounce), .MyType = _profile.MyDamageType,
+					.MyTags = static_cast<DamageTags>(DamageTag::CHAIN), .MyIsAttack = true, .MyIsSkill = _profile.MySkillDamage});
+				totalDealt += dealt;
 				if (std::isgreater(_profile.MyChainSluggish, 0) && Unit(best).MyAlive) (void)ApplyStatus(best, CombatStatus::SLUGGISH, _profile.MyChainSluggish, _source);
 				ContentEvent event{.MyKind = ContentEventKind::ATTACK_HIT, .MySource = _source, .MyTarget = best, .MyAmount = dealt, .MyChain = true};
 				NotifyContent(event);
@@ -270,6 +282,8 @@ namespace Stronghold
 			for (unsigned i = 0; i < source.MyDefinition.MyProfession.MyShockCount; ++i)
 				Schedule(ScheduledAction{.MyAt = Time() + 0.3 * (i + 1.0), .MyKind = ScheduledKind::AFTERSHOCK,
 					.MySource = _source, .MyPoint = _point});
+		if (source.MyDefinition.MyOperatorKit) OperatorAfterHit(_source, _target);
+		if (_profile.MyGenericHit) GenericHit(_source, _target, totalDealt);
 	}
 
 	void Battle::HealAttack(const CombatUnit& _source, UnitId _target, const AttackProfile& _profile)
@@ -277,12 +291,15 @@ namespace Stronghold
 		auto& scratch = AcquireAttackScratch();
 		const AttackGuard guard{.MyDepth = _MyAttackDepth};
 		auto amount = _source.MyStats.MyAttack * _profile.MyAttackScale * _profile.MyHealScale * _source.MyStats.MyAttackScaleMultiplier;
-		const auto& position = Unit(_target).MyPosition;
-		const auto tileDistance = std::max(std::abs(std::floor(position.MyX + 0.5) - std::floor(_source.MyPosition.MyX + 0.5)),
-			std::abs(std::floor(position.MyY + 0.5) - std::floor(_source.MyPosition.MyY + 0.5)));
+		const bool initialPosition = _source.MySkill.MyActive && UsesInitialPosition(_source);
+		const auto point = [&](const CombatUnit& _unit) { return initialPosition ? RulePosition(_unit) : _unit.MyPosition; };
+		const auto position = point(Unit(_target)), origin = point(_source);
+		const auto tileDistance = std::max(std::abs(std::floor(position.MyX + 0.5) - std::floor(origin.MyX + 0.5)),
+			std::abs(std::floor(position.MyY + 0.5) - std::floor(origin.MyY + 0.5)));
 		if (std::isgreater(_profile.MyHealFarMultiplier, 0) && std::isgreater(tileDistance, _profile.MyHealNearDistance)) amount *= _profile.MyHealFarMultiplier;
 		if (std::isgreater(_profile.MyElementHealRatio, 0)) (void)ReduceElement(_target, _source.MyStats.MyAttack * _profile.MyElementHealRatio);
 		(void)Heal(_source.MyId, _target, amount);
+		MedicHealAttack(_source.MyId, _target, amount);
 		scratch.MySeen.emplace_back(_target);
 		auto previous = _target;
 		for (unsigned bounce = 1; bounce < _profile.MyHealChainCount && !Finished(); ++bounce)
@@ -292,8 +309,8 @@ namespace Stronghold
 			{
 				const auto& ally = _MyUnits[Index(_MyAllyIds[i])];
 				if (!ally.MyAlive || ally.MyKind == UnitKind::DEVICE || ally.MyHidden || std::ranges::find(scratch.MySeen, ally.MyId) != scratch.MySeen.end()) continue;
-				const auto& from = Unit(previous).MyPosition;
-				if (std::isgreater(std::abs(ally.MyPosition.MyX - from.MyX), 1) || std::isgreater(std::abs(ally.MyPosition.MyY - from.MyY), 1)) continue;
+				const auto from = point(Unit(previous)), to = point(ally);
+				if (std::isgreater(std::abs(to.MyX - from.MyX), 1) || std::isgreater(std::abs(to.MyY - from.MyY), 1)) continue;
 				if (ally.MyId != _source.MyId && (ally.MyStatuses.Has(CombatStatus::ISOLATED) || ally.MyStatuses.Has(CombatStatus::NO_HEAL) || ally.MyDefinition.MyAttack.MyNoHeal)) continue;
 				const auto ratio = ally.MyHealth / ally.MyStats.MyMaxHealth;
 				const auto bestRatio = best ? Unit(best).MyHealth / Unit(best).MyStats.MyMaxHealth : 2;
@@ -350,7 +367,7 @@ namespace Stronghold
 				continue;
 			}
 			if (!projectile.MyProfile.MyBoomerang || target || std::isgreater(projectile.MyProfile.MySplashRadius, 0))
-				Hit(projectile.MySource, target, projectile.MyProfile, projectile.MyDestination);
+				Hit(projectile.MySource, target, projectile.MyProfile, projectile.MyDestination, projectile.MyInitialPositionAttack);
 			// 返程下一帧才开始推进；发射者死亡或免费移动改变部署身份时不产生返程。
 			if (projectile.MyProfile.MyBoomerang && source.MyAlive && source.MyDeploySequence == projectile.MySourceLife)
 				_MyProjectiles.emplace_back(Projectile{.MySource = source.MyId, .MyTarget = source.MyId,

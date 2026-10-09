@@ -28,7 +28,8 @@ namespace
 		std::cout << "],["; bool first = true;
 		for (const auto& event : _battle.DrainEvents()) if (event.MyKind == BattleEventKind::LAYERS_GAINED)
 		{
-			if (!first) std::cout << ','; first = false;
+			if (!first) std::cout << ',';
+			first = false;
 			std::cout << '[' << std::quoted(_battle.Players()[event.MyPlayer].MyPlayerId) << ',' << std::quoted(_battle.Players()[event.MyPlayer].MyLayerGains[event.MyBondIndex].MyId) << ',' << event.MyAmount << ']';
 		}
 		std::cout << "]]";
@@ -52,11 +53,13 @@ int main()
 		if (kind == 3) input.MyLayerGainsEnabled = true;
 		if (hooked) input.MyContentBindings.emplace_back(ContentBinding{.MyContent = hook, .MyPlayerId = "p"});
 		Battle battle(std::move(input)); battle.Start();
-		if (scene) std::cout << ','; std::cout << '[';
+		if (scene) std::cout << ',';
+		std::cout << '[';
 		bool first = true;
 		const auto add = [&](std::string_view _bond, double _amount, std::string_view _reason = "", UnitId _source = 0, std::optional<WorldPoint> _tile = {})
 		{
-			if (!first) std::cout << ','; first = false;
+			if (!first) std::cout << ',';
+			first = false;
 			const auto added = battle.AddBondLayers("p", _bond, _amount, LayerGainOptions{.MySource = _source, .MyTile = _tile, .MyReason = _reason}); Snapshot(battle, added);
 		};
 		add("known", 0.75); add("absent", 1.5); add("known", 10000, "double"); add("known", 1);

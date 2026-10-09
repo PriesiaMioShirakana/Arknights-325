@@ -60,6 +60,7 @@ namespace Stronghold
 		int MyRewardTierOffset{1};
 		int MyRewardMaxTier{6};
 		int MyRewardPrice{};
+		unsigned MyMaxArtsPerRound{2};
 
 		[[nodiscard]] int IncomeAt(int _round) const
 		{

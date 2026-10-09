@@ -7,6 +7,7 @@ namespace Stronghold
 {
 	bool Battle::InRange(const CombatUnit& _attacker, const CombatUnit& _target) const
 	{
+		if (_attacker.MySkill.MyActive) return InRuleRange(_attacker.MyId, _target.MyId);
 		return BodyInRange(_target, _attacker.MyRangeMask);
 	}
 
@@ -49,7 +50,9 @@ namespace Stronghold
 			for (std::size_t i = 0; i < _MyAllyIds.size(); ++i)
 			{
 				const auto& ally = _MyUnits[Index(_MyAllyIds[i])];
-				if (ally.MyAlive && ally.MyKind != UnitKind::DEVICE && !ally.MyHidden && !ally.MyDefinition.MyAttack.MyNoHeal && !ally.MyStatuses.Has(CombatStatus::HEAL_FREE) && (ally.MyId == _unit.MyId || (!ally.MyStatuses.Has(CombatStatus::NO_HEAL) && !ally.MyStatuses.Has(CombatStatus::ISOLATED))) && (std::isless(ally.MyHealth, ally.MyStats.MyMaxHealth - 1e-6) ||
+				// 原 injuredAlliesInKeys 只在选目标时检查 noHeal；healFree 留给治疗管线，isolated 留给技能自己的选择器。
+				if (ally.MyAlive && ally.MyKind != UnitKind::DEVICE && !ally.MyHidden &&
+					(ally.MyId == _unit.MyId || (!ally.MyStatuses.Has(CombatStatus::NO_HEAL) && !ally.MyDefinition.MyAttack.MyNoHeal)) && (std::isless(ally.MyHealth, ally.MyStats.MyMaxHealth - 1e-6) ||
 						(std::isgreater(profile.MyElementHealRatio, 0) && !ally.MyStatuses.Has(CombatStatus::BURST_LOCK) && std::ranges::any_of(ally.MyElements.MyGauges, [](double _gauge) { return std::isgreater(_gauge, 0); }))) &&
 					std::islessequal(ally.MyHealth / ally.MyStats.MyMaxHealth, profile.MyHealHpAtMost + 1e-9) && InRange(_unit, ally))
 					_MyTargetCandidates.emplace_back(ally.MyId, 0, ally.MyHealth / ally.MyStats.MyMaxHealth, 0.0, 0.0, ally.MyDeploySequence);
@@ -88,10 +91,10 @@ namespace Stronghold
 					priority = -enemy.MyHealth;
 					break;
 				case TargetPriority::NEAREST:
-					priority = BodyDistance(enemy, _unit.MyPosition);
+					priority = BodyDistance(enemy, _unit.MySkill.MyActive ? RulePosition(_unit) : _unit.MyPosition);
 					break;
 				case TargetPriority::FARTHEST:
-					priority = -BodyDistance(enemy, _unit.MyPosition);
+					priority = -BodyDistance(enemy, _unit.MySkill.MyActive ? RulePosition(_unit) : _unit.MyPosition);
 					break;
 				default:
 					break;
@@ -166,15 +169,16 @@ namespace Stronghold
 			_unit.MyAttackCooldown = std::max(0.0, _unit.MyAttackCooldown - BattleClock::StepSeconds);
 		if (_unit.MyAttackCooldown > 0 || AttackDisabled(_unit) || _unit.MyStatuses.Has(CombatStatus::DISARM))
 			return;
-		if (!ProfessionCanAttack(_unit)) { StoreEnergy(_unit); return; }
+		if (!ProfessionCanAttack(_unit) || !OperatorCanAttack(_unit)) { StoreEnergy(_unit); return; }
 		auto targets = AllyTargets(_unit);
-		if (targets.empty()) { StoreEnergy(_unit); return; }
+		if (targets.empty() && !UsesInitialPosition(_unit)) { StoreEnergy(_unit); return; }
 		if (SkillAboutToAttack(_unit))
 		{
 			if (Finished() || !_unit.MyAlive || AttackDisabled(_unit)) return;
 			targets = AllyTargets(_unit);
 			if (targets.empty()) { StoreEnergy(_unit); return; }
 		}
+		if (targets.empty()) { StoreEnergy(_unit); return; }
 		Attack(_unit, targets);
 		_unit.MyAttackCooldown = _unit.MyStats.AttackInterval();
 	}
@@ -277,7 +281,8 @@ namespace Stronghold
 			(target.MyStatuses.Has(CombatStatus::SLEEP) && !damage.MyHitSleep) ||
 			(!damage.MySourceless && !damage.MyIgnoreSelect && _source && target.MySide == UnitSide::ALLY &&
 				target.MyStatuses.Has(CombatStatus::LIFTOFF) && !Unit(_source).Flying())) return 0;
-		if (!_MyContentInstances.empty())
+		if (!_MyContentInstances.empty() || _MyBandHitEffects || _MyEquipmentHitEffects || _MyBondHitEffects || _MyTinmanWither || !_MyGarrisons.empty() ||
+			target.MyDefinition.MyOperatorKit || (_source && Unit(_source).MyDefinition.MyOperatorKit))
 		{
 			ContentEvent event{.MyKind = ContentEventKind::BEFORE_DAMAGE, .MySource = damage.MySourceless ? 0 : _source, .MyTarget = _target, .MyDamage = damage, .MyCredit = _source};
 			NotifyContent(event);

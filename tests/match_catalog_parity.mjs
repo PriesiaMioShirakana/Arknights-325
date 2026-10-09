@@ -14,7 +14,8 @@ for(const row of actual){
  const expected=[gd.modeId,+gd.isSolo,gd.difficulty,gd.lastRound,gd.bossRound,gd.hiddenRound??0,gd.spRounds(),
   Array.from({length:16},(_,i)=>[gd.prepTime(i+1),gd.combatTimeLimit(i+1),gd.bossLevelTime(i+1)]),
   gd.bandIds().map(id=>[id,gd.startLp(id),gd.band(id).effectId??'',gd.band(id).bondIds??[]]),
-  [gd.timer('infoCheck'),gd.timer('battleCheck'),gd.timer('bandTurn'),gd.bandDraft.skipsPerPlayer,gd.bandDraft.timeoutBandId,gd.timer('spFirst'),gd.timer('spTurn'),gd.lpCapPerRound],
+  [gd.timer('infoCheck'),gd.timer('battleCheck'),gd.timer('bandTurn'),gd.bandDraft.skipsPerPlayer,gd.bandDraft.timeoutBandId,gd.timer('spFirst'),gd.timer('spTurn'),gd.lpCapPerRound,
+   gd.bans(gd.difficulty).core,gd.bans(gd.difficulty).addon,gd.unite.maxHelpers,gd.dp.dpInit,gd.dp.dpPerSec,gd.dp.dpMax],
   [...Object.keys(data.bosses).sort(),'unknown'].map(id=>[id,bossPoolHp(gd,id),Array.from({length:22},(_,n)=>[bossPoolHp(gd,id,n),bossPoolHp(gd,id,n,{experimental:true})])]),
   Array.from({length:8},(_,i)=>+hiddenEligible(gd,{layerSum:i<4?1200:2401,teamLp:i%3?2:1,aliveCount:i%2?8:4,experimental:i%2!==0}))];
  assert.deepEqual(row,expected,gd.modeId);

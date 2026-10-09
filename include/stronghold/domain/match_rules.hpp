@@ -49,6 +49,12 @@ namespace Stronghold
 		unsigned MyStrategySkips{1};
 		std::string_view MyDefaultStrategy{"band_bldsk"};
 		unsigned MyLifeCapPerRound{10};
+		unsigned MyDisabledCoreBonds{};
+		unsigned MyDisabledAddonBonds{};
+		unsigned MyMaxUniteHelpers{2};
+		double MyInitialDp{10};
+		double MyDpPerSecond{1};
+		double MyMaxDp{99};
 
 		[[nodiscard]] MatchRoundRules Round(unsigned _round) const
 		{

@@ -54,6 +54,88 @@ namespace Stronghold
 
 	void Battle::ValidateDefinition(const CombatDefinition& _definition, bool _enemy)
 	{
+		if (static_cast<unsigned>(_definition.MyOperatorProfession) > static_cast<unsigned>(OperatorProfession::SPECIAL))
+			throw std::invalid_argument("invalid operator profession");
+		if (_definition.MyOperatorKit)
+		{
+			if (_enemy) throw std::invalid_argument("operator kit on enemy");
+			const auto valid = std::visit([](const auto& kit)
+			{
+				using T = std::decay_t<decltype(kit)>;
+				if constexpr (std::is_same_v<T, InsiderKit>) return Bounded(kit.MyDelay) && Bounded(kit.MySelfAmmo) && Bounded(kit.MyAllyAmmo);
+				else if constexpr (std::is_same_v<T, YakKit>) return Bounded(kit.MyResistance, -1e9);
+				else if constexpr (std::is_same_v<T, LeiziKit>) return Bounded(kit.MyUnblockedScale);
+				else if constexpr (std::is_same_v<T, UdflowKit>) return Bounded(kit.MyDuration) && Bounded(kit.MyInterval) && Bounded(kit.MyDamage) && Bounded(kit.MySeaDamage);
+				else if constexpr (std::is_same_v<T, VignaKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MySkillProbability, 0, 1) && Bounded(kit.MyAttack, -1e9) &&
+					Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyLowHealthScale);
+				else if constexpr (std::is_same_v<T, VendlaKit>) return Bounded(kit.MyHealingScale) && Bounded(kit.MyCounterScale) && Bounded(kit.MyTaunt, -1e9);
+				else if constexpr (std::is_same_v<T, ProveKit>) return Bounded(kit.MyHealthDrop) && Bounded(kit.MyScalePerDrop) &&
+					Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyFrontProbability, 0, 1) && Bounded(kit.MyCriticalScale);
+				else if constexpr (std::is_same_v<T, TexasKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return Bounded(kit.MyInitialDp) && Bounded(kit.MyDp) && Bounded(kit.MyScale) && Bounded(kit.MyStun);
+				}
+				else if constexpr (std::is_same_v<T, CaperKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyCriticalScale) && Bounded(kit.MyNearScale);
+				else if constexpr (std::is_same_v<T, SunbrKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyCriticalScale) && Bounded(kit.MyStun) &&
+					Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyHealingScale) && Bounded(kit.MyCookingSeconds) && Bounded(kit.MyCookingDefense, -1e9) && Bounded(kit.MyServingAttack, -1e9);
+				else if constexpr (std::is_same_v<T, SkgoatKit> || std::is_same_v<T, GreyyKit>) return true;
+				else if constexpr (std::is_same_v<T, EstellKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return Bounded(kit.MyHealRatio) && Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyPhysicalReduction, 0, 1);
+				}
+				else if constexpr (std::is_same_v<T, PodegoKit>) return Bounded(kit.MyAuraAttack, -1e9) && Bounded(kit.MySpPerSecond) &&
+					Bounded(kit.MyZoneDuration, 0, 3600) && Bounded(kit.MyZoneScale);
+				else if constexpr (std::is_same_v<T, PithstKit>) return Bounded(kit.MyElementRatio) && Bounded(kit.MyEliteElementRatio);
+				else if constexpr (std::is_same_v<T, TinmanKit>) return Bounded(kit.MyDuration, 0, 3600) && Bounded(kit.MyRadius, 0, 100) &&
+					Bounded(kit.MyDamageScale) && Bounded(kit.MyRegenRatio) && Bounded(kit.MyWeaken, 0, 1) && Bounded(kit.MyWitherScale) && Bounded(kit.MySpPerSecond);
+				else if constexpr (std::is_same_v<T, IndigoKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyBindDuration, 0, 3600) &&
+					Bounded(kit.MySkillProbabilityScale) && Bounded(kit.MyDamageScale) && Bounded(kit.MyInterval, 0, 3600);
+				else if constexpr (std::is_same_v<T, UtageKit>) return Bounded(kit.MyMaxAttackSpeed) && Bounded(kit.MyMinHealthRatio, 0, 1) &&
+					Bounded(kit.MyProtectThreshold, 0, 1) && Bounded(kit.MyProtection, 0, 1) && Bounded(kit.MyHealthLoss, 0, 1);
+				else return false;
+			}, *_definition.MyOperatorKit);
+			if (!valid) throw std::invalid_argument("invalid operator kit");
+		}
+		if (_definition.MyGenericSkill)
+		{
+			const auto& effect = *_definition.MyGenericSkill;
+			if (_enemy || (effect.MyElement && *effect.MyElement >= Element::COUNT) ||
+				(effect.MyBurstType && *effect.MyBurstType > DamageType::ELEMENTAL) || effect.MyCounterType > DamageType::ELEMENTAL ||
+				(effect.MyShieldDecay && !(effect.MyShieldDuration > 0)) ||
+				(!effect.MyDebuff.empty() && (effect.MyDebuffKey.empty() || effect.MyDebuffKey.size() > 256)) ||
+				(effect.MyShield > 0 && (effect.MyShieldKey.empty() || effect.MyShieldKey.size() > 256))) throw std::invalid_argument("invalid generic skill effect");
+			for (const auto value : {effect.MyProbability, effect.MySelfStun, effect.MyElementRatio, effect.MyForce.value_or(0), effect.MyHealAlly,
+				effect.MyDebuffDuration, effect.MyDp, effect.MyLoseHp, effect.MyHealHp, effect.MyShield, effect.MyShieldDuration,
+				effect.MyStartBurst, effect.MyEndBurst, effect.MyCounterScale, effect.MyCounterCooldown})
+				if (!Bounded(value, -1e9)) throw std::invalid_argument("invalid generic skill parameter");
+			for (const auto statuses : {effect.MyHitStatuses, effect.MyStartStatuses})
+				for (const auto status : statuses) if (status.MyStatus >= CombatStatus::COUNT || !Bounded(status.MyDuration)) throw std::invalid_argument("invalid generic skill status");
+			AttributeModifiers modifiers; modifiers.Add(effect.MyDebuff);
+		}
+		for (const auto& effect : _definition.MyEquipmentEffects)
+		{
+			const auto& p = effect.MyParameters;
+			if (effect.MyKey.empty() || effect.MyKey.size() > 200 || effect.MyPartner.size() > 200 ||
+				p.MyKind < EquipmentEffectKind::DISTANCE_DAMAGE || p.MyKind > EquipmentEffectKind::STEAM_HEART ||
+				!Bounded(p.MyValue, -1e9) || !Bounded(p.MyExtra, -1e9) || !Bounded(p.MyProbability, -1e9) ||
+				!Bounded(p.MyDuration) || !Bounded(p.MyInterval) || !Bounded(p.MyThreshold, -1e9) || p.MyMaximum > 1000000)
+				throw std::invalid_argument("invalid equipment behaviour");
+		}
+		if (_definition.MyYanyou)
+		{
+			const auto& kit = *_definition.MyYanyou;
+			if (_enemy || !Bounded(kit.MyRangeRadius, 0, 100) || !Bounded(kit.MyMoveSpeed) || !Bounded(kit.MyBurnRatio) ||
+				!Bounded(kit.MyFragileMultiplier) || !Bounded(kit.MyFlameScale) || !Bounded(kit.MyFlameRadius, 0, 100) || kit.MyDeployLimit > 1000000)
+				throw std::invalid_argument("invalid Yanyou kit");
+		}
+		if (_definition.MyMedic)
+		{
+			const auto& medic = *_definition.MyMedic;
+			if (!Bounded(medic.MyHealSp) || !Bounded(medic.MyDeathSp) || !Bounded(medic.MySkillHpRatio, 0, 1) ||
+				!Bounded(medic.MySkillHealMultiplier) || !Bounded(medic.MySkillExtraHeal)) throw std::invalid_argument("invalid medic kit");
+		}
 		if (_definition.MyHitArea)
 		{
 			const auto& area = *_definition.MyHitArea;
@@ -161,6 +243,8 @@ namespace Stronghold
 			_MyInput.MySharedBoss = std::ref(assault.Pool());
 		}
 		const bool unlimitedBoss = _MyInput.MyBossBattle && std::isinf(_MyInput.MyTimeLimit) && std::isgreater(_MyInput.MyTimeLimit, 0);
+		if (static_cast<unsigned>(_MyInput.MyRulePositionMode) > static_cast<unsigned>(RulePositionMode::INITIAL))
+			throw std::invalid_argument("invalid rule position mode");
 		if (_MyInput.MyPlayers.empty() || _MyInput.MyPlayers.size() > 20 || _MyInput.MySpawns.size() > 10000 ||
 			(!unlimitedBoss && !Bounded(_MyInput.MyTimeLimit, BattleClock::StepSeconds, 3600)) || !Bounded(_MyInput.MyInitialDp) || !Bounded(
 				_MyInput.MyDpPerSecond
@@ -186,6 +270,17 @@ namespace Stronghold
 				if (step.MyKind == RouteStepKind::MOVE || step.MyKind == RouteStepKind::APPEAR)
 					ValidatePoint(step.MyPosition, true);
 			}
+		}
+		if (!std::ranges::is_sorted(_MyInput.MyEquipmentTemplates, {}, &EquipmentTemplate::MyId)) throw std::invalid_argument("equipment catalog must be sorted");
+		for (const auto& item : _MyInput.MyEquipmentTemplates)
+		{
+			if (item.MyId.empty() || item.MyId.size() > 180 || item.MyStats.size() > 64 || item.MyEffects.size() > 64)
+				throw std::invalid_argument("invalid equipment catalog entry");
+			CombatDefinition check{.MyId = "equipment-template"};
+			for (const auto& effect : item.MyEffects) check.MyEquipmentEffects.push_back({std::string(item.MyId), effect.MyParameters, std::string(effect.MyPartner)});
+			ValidateDefinition(check, false);
+			for (const auto& stat : item.MyStats) ValidateBuff(BuffDefinition{.MyKey = "item:" + std::string(item.MyId) + "@lend:stat:" + std::string(stat.MyBuff),
+				.MyModifiers = std::vector<AttributeChange>(stat.MyModifiers.begin(), stat.MyModifiers.end())});
 		}
 		std::set<std::string, std::less<>> playerIds;
 		std::set<std::pair<int, int>> occupied;
@@ -329,8 +424,41 @@ namespace Stronghold
 		_MyContentInstances.reserve(customCount);
 		for (const auto& unit : _MyUnits)
 			AttachContent(unit.MyDefinition.MyContent, unit.MyId, 0, unit.MyOwner);
-		for (const auto id : _MyAllyIds) InstallProfession(_MyUnits[Index(id)]);
+		_MyInsiderGrants.reserve(_MyAllyIds.size());
+		_MyTexasUnits.reserve(_MyAllyIds.size());
+		_MyEstells.reserve(_MyAllyIds.size()); _MyPodegos.reserve(_MyAllyIds.size());
+		_MyUtages.reserve(_MyAllyIds.size());
+		for (const auto id : _MyAllyIds)
+		{
+			InstallProfession(_MyUnits[Index(id)]);
+			InstallOperatorKit(_MyUnits[Index(id)]);
+		}
+		_MyMedics.reserve(_MyAllyIds.size() + _MyInput.MyPlayers.size());
+		for (const auto id : _MyAllyIds) InstallUnitEffects(_MyUnits[Index(id)]);
+		if (_MyInput.MyYanyouDefinition)
+		{
+			ValidateDefinition(*_MyInput.MyYanyouDefinition, false);
+			if (!_MyInput.MyYanyouDefinition->MyYanyou) throw std::invalid_argument("missing Yanyou kit");
+		}
+		for (const auto& variant : _MyInput.MyMapCharacters)
+		{
+			if (variant.MyMinimumElites > variant.MyMaximumElites) throw std::invalid_argument("invalid map character condition");
+			for (const auto& character : variant.MyCharacters)
+			{
+				ValidateDefinition(character.MyDefinition, false);
+				ValidateContent(character.MyDefinition.MyContent, ContentTag::CUSTOM_OPERATOR);
+				for (const auto& slot : character.MyPositions)
+				{
+					ValidatePoint({static_cast<double>(slot.MyPosition.MyColumn), static_cast<double>(slot.MyPosition.MyRow)});
+					if (slot.MyFacing > Facing::LEFT) throw std::invalid_argument("invalid map character direction");
+				}
+			}
+		}
 		InstallChoiceEffects();
+		InstallBandEffects();
+		InstallCoreBonds();
+		InstallAddonBonds();
+		InstallGarrisons();
 		for (const auto& binding : _MyInput.MyContentBindings)
 		{
 			const auto tag = binding.MyContent.MyTag;
@@ -396,6 +524,7 @@ namespace Stronghold
 		}
 		std::ranges::sort(summons, {}, [&](UnitId _id) { return Unit(_id).MyDeploySequence; });
 		for (const auto id : summons) _MyUnits[Index(id)].MyAggroSequence = ++_MyDeploySequence;
+		if (_MyEquipmentEnemyQueries || !_MyInput.MyEquipmentTemplates.empty()) BuildEnemyIndex();
 		for (std::size_t i = 0; i < _MyAllyIds.size() && !Finished(); ++i)
 		{
 			auto& unit = _MyUnits[Index(_MyAllyIds[i])];
@@ -451,6 +580,7 @@ namespace Stronghold
 		_unit.MyStatuses = {};
 		_unit.MyElements = {};
 		_unit.MyDeploySequence = ++_MyDeploySequence;
+		_unit.MyDeployedAt = Time();
 		_unit.MyAggroSequence = _unit.MyDeploySequence;
 		Recalculate(_unit);
 		_unit.MyHealth = _unit.MyStats.MyMaxHealth;
@@ -515,6 +645,7 @@ namespace Stronghold
 		for (std::size_t i = 0, count = _MyEnemyIds.size(); i < count && !Finished(); ++i)
 			if (auto& unit = _MyUnits[Index(_MyEnemyIds[i])]; unit.MyAlive)
 				UpdateEnemy(unit);
+		if (_MyEquipmentEnemyQueries || !_MyInput.MyEquipmentTemplates.empty()) BuildEnemyIndex();
 		for (std::size_t i = 0; i < _MyAllyIds.size() && !Finished(); ++i)
 			if (auto& unit = _MyUnits[Index(_MyAllyIds[i])]; unit.MyAlive && unit.MyKind != UnitKind::DEVICE)
 				UpdateAlly(unit);
@@ -563,6 +694,7 @@ namespace Stronghold
 
 	void Battle::CheckRedeploys()
 	{
+		if (_MyEquipmentEnemyQueries || !_MyInput.MyEquipmentTemplates.empty()) BuildEnemyIndex();
 		for (std::size_t i = 0; i < _MyAllyIds.size() && !Finished(); ++i)
 		{
 			const auto& unit = Unit(_MyAllyIds[i]);

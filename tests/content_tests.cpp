@@ -202,6 +202,44 @@ namespace
 		}
 	};
 
+	struct PassiveStartHandler final : CustomOperator<PassiveStartHandler>
+	{
+		void OnSkillStart(Battle& _battle, ContentEvent& _event)
+		{
+			if (_event.MySkillReason == SkillReason::PASSIVE)
+				(void)_battle.AddBuff(_event.MyUnit, BuffDefinition{.MyKey = "personal-start", .MyModifiers = std::vector<AttributeChange>{{Attribute::ATTACK_FLAT, 3}}});
+		}
+	};
+
+	struct GlobalStartHandler final : CustomBond<GlobalStartHandler>
+	{
+		void OnSkillStart(Battle& _battle, ContentEvent& _event)
+		{
+			(void)_battle.AddBuff(_event.MyUnit, BuffDefinition{.MyKey = "global-start", .MyModifiers = std::vector<AttributeChange>{{Attribute::ATTACK_FLAT, 100}}});
+		}
+	};
+
+	void PassiveStarts()
+	{
+		ContentRegistry registry;
+		const auto personal = registry.Register<PassiveStartHandler>("personal-start");
+		const auto global = registry.Register<GlobalStartHandler>("global-start"); registry.Seal();
+		CombatDefinition passive{.MyId = "passive", .MyStats = {.MyMaxHealth = 100, .MyAttack = 10}, .MyAttack = {.MyDisabled = true},
+			.MySkill = {.MyKind = SkillKind::PASSIVE}};
+		passive.MyContent = personal;
+		CombatDefinition active = passive; active.MyId = "active"; active.MySkill = {.MyKind = SkillKind::DURATION, .MyTrigger = SkillTrigger::NEVER, .MyDuration = 1};
+		BattleInput input{.MyPlayers = {BattlePlayerInput{.MyPlayerId = "one", .MyUnits = {
+			AllyDeployment{.MyPieceUid = 1, .MyDefinition = std::move(passive), .MyPosition = {5, 9}},
+			AllyDeployment{.MyPieceUid = 2, .MyDefinition = std::move(active), .MyPosition = {6, 9}}}}},
+			.MyAutoFinish = false, .MyContentRegistry = std::cref(registry), .MyContentBindings = {{global, "one"}}};
+		Battle battle(std::move(input)); battle.Start();
+		Check(battle.Unit(1).MySkill.MyActive && Close(battle.Unit(1).MyStats.MyAttack, 13));
+		Check(Close(battle.Unit(2).MyStats.MyAttack, 10));
+		Check(battle.ActivateSkill(2, true) && Close(battle.Unit(2).MyStats.MyAttack, 110));
+		battle.Retreat(1); Check(battle.Redeploy(1));
+		Check(Close(battle.Unit(1).MyStats.MyAttack, 13) && battle.ContentErrors().empty());
+	}
+
 	void WindScheduling()
 	{
 		ContentRegistry registry;
@@ -234,6 +272,6 @@ namespace
 
 int main()
 {
-	try { RegistrationAndDispatch(); ErrorIsolation(); DamageLifecycle(); WindScheduling(); std::cout << "4 custom content test groups passed\n"; }
+	try { RegistrationAndDispatch(); ErrorIsolation(); DamageLifecycle(); WindScheduling(); PassiveStarts(); std::cout << "5 custom content test groups passed\n"; }
 	catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

@@ -1,6 +1,8 @@
 #ifndef STRONGHOLD_ADAPTERS_REFERENCE_ALLY_HPP
 #define STRONGHOLD_ADAPTERS_REFERENCE_ALLY_HPP
 #include <stronghold/adapters/reference_combat.hpp>
+#include <stronghold/adapters/reference_generic_skill.hpp>
+#include <stronghold/adapters/reference_operator_kit.hpp>
 
 namespace Stronghold
 {
@@ -69,6 +71,13 @@ namespace Stronghold
 		ProfessionDefinition MyProfessionTraits{};
 		PlacementClass MyPreparationPlacement{PlacementClass::MELEE};
 		std::span<const RangeOffset> MyPreparationRange{}; // 部署时的技能/模组常驻范围，不是战斗中技能开启后的范围。
+		const GenericSkillRecord* MyGenericSkill{};
+		std::span<const GenericTalentRecord> MyGenericTalents{};
+		const OperatorKitRecord* MyOperatorKit{};
+		OperatorProfession MyOperatorProfession{};
+
+		[[nodiscard]] CombatDefinition MakeGenericDefinition(bool _talents = false) const;
+		[[nodiscard]] CombatDefinition MakeKitDefinition(bool _genericTalents = false) const;
 
 		// 职业和内容层必须显式提供解析后的攻击／技能；这里不把缺少脚本的黑板伪装成完整技能。
 		[[nodiscard]] CombatDefinition MakeDefinition(AttackProfile _attack, SkillDefinition _skill = {}) const
@@ -78,8 +87,12 @@ namespace Stronghold
 			return CombatDefinition{.MyId = std::string(MyId), .MyStats = stats, .MyAttack = std::move(_attack),
 				.MyRange = std::vector<RangeOffset>(MyRange.begin(), MyRange.end()),
 				.MyImmunities = StatusFlags(MyImmunities), .MySkill = std::move(_skill),
-				.MyTraitFrontRange = MyHasTraitFrontRange ? std::optional(std::vector<RangeOffset>(MyTraitFrontRange.begin(), MyTraitFrontRange.end())) : std::nullopt, .MyProfession = MyProfessionTraits};
+				.MyTraitFrontRange = MyHasTraitFrontRange ? std::optional(std::vector<RangeOffset>(MyTraitFrontRange.begin(), MyTraitFrontRange.end())) : std::nullopt,
+				.MyProfession = MyProfessionTraits, .MyOperatorProfession = MyOperatorProfession};
 		}
+
+	private:
+		[[nodiscard]] CombatDefinition MakeDefinitionWithSkill(const GenericSkillRecord* _skill, bool _talents) const;
 	};
 
 	struct AllyLoadoutRecord

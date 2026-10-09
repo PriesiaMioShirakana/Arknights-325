@@ -4,33 +4,39 @@
 
 namespace Stronghold
 {
-	namespace
+	void Battle::ValidateBuff(const BuffDefinition& _definition)
 	{
-		void ValidateBuff(const BuffDefinition& _definition)
+		if (_definition.MyKey.empty() || _definition.MyKey.size() > 256 ||
+			(std::isnan(_definition.MyDuration) || std::isless(_definition.MyDuration, 0)) || _definition.MyStacks == 0 || _definition.MyStacks > 1000000 ||
+			_definition.MyMaxStacks == 0 || _definition.MyMaxStacks > 1000000 ||
+			static_cast<unsigned>(_definition.MyRefresh) > static_cast<unsigned>(BuffRefresh::KEEP) ||
+			!std::isfinite(_definition.MyInterval) || _definition.MyInterval < 0 ||
+			!std::isfinite(_definition.MyShield.MyHealth) || _definition.MyShield.MyHealth < 0 ||
+			_definition.MyShield.MyHits < 0 || _definition.MyShield.MyTypeMask > 15)
+			throw std::invalid_argument("invalid buff definition");
+		if (static_cast<unsigned>(_definition.MyBuiltin) > static_cast<unsigned>(BuiltinBuff::SIRACUSA_STEALTH)) throw std::invalid_argument("invalid builtin buff");
+		if (_definition.MyStatus && *_definition.MyStatus >= CombatStatus::COUNT) throw std::invalid_argument("invalid buff status");
+		if (_definition.MyStealthRestore && (!std::isfinite(*_definition.MyStealthRestore) || std::isless(*_definition.MyStealthRestore, 0))) throw std::invalid_argument("invalid stealth restore time");
+		if (_definition.MyElementBurst && *_definition.MyElementBurst >= Element::COUNT) throw std::invalid_argument("invalid burst element");
+		if (_definition.MyStrength)
 		{
-			if (_definition.MyKey.empty() || _definition.MyKey.size() > 256 ||
-				(std::isnan(_definition.MyDuration) || std::isless(_definition.MyDuration, 0)) || _definition.MyStacks == 0 || _definition.MyStacks > 1000000 ||
-				_definition.MyMaxStacks == 0 || _definition.MyMaxStacks > 1000000 ||
-				static_cast<unsigned>(_definition.MyRefresh) > static_cast<unsigned>(BuffRefresh::KEEP) ||
-				!std::isfinite(_definition.MyInterval) || _definition.MyInterval < 0 ||
-				!std::isfinite(_definition.MyShield.MyHealth) || _definition.MyShield.MyHealth < 0 ||
-				_definition.MyShield.MyHits < 0 || _definition.MyShield.MyTypeMask > 15)
-				throw std::invalid_argument("invalid buff definition");
-			if (static_cast<unsigned>(_definition.MyBuiltin) > static_cast<unsigned>(BuiltinBuff::DOLL_FORM)) throw std::invalid_argument("invalid builtin buff");
-			if (_definition.MyStealthRestore && (!std::isfinite(*_definition.MyStealthRestore) || std::isless(*_definition.MyStealthRestore, 0))) throw std::invalid_argument("invalid stealth restore time");
-			if (_definition.MyElementBurst && *_definition.MyElementBurst >= Element::COUNT) throw std::invalid_argument("invalid burst element");
-			if (_definition.MyModifiers)
-			{
-				AttributeModifiers check;
-				check.Add(*_definition.MyModifiers, _definition.MyStacks);
-			}
-			for (const auto* effects : {&_definition.MyTickEffects, &_definition.MyExpireEffects, &_definition.MyRemoveEffects})
-				for (const auto& effect : *effects)
-					if (!std::isfinite(effect.MyAmount) || effect.MyAmount < 0 ||
-						static_cast<unsigned>(effect.MyKind) > static_cast<unsigned>(BuffEffectKind::HEALTH_LOSS) ||
-						static_cast<unsigned>(effect.MyDamageType) > static_cast<unsigned>(DamageType::ELEMENTAL))
-						throw std::invalid_argument("invalid buff effect");
+			const auto& strength = *_definition.MyStrength;
+			if (!std::isfinite(strength.MyValue) || !std::isfinite(strength.MyScale) || !std::isfinite(strength.MyOffset) ||
+				strength.MyAttribute >= Attribute::COUNT || (strength.MySecondAttribute && (*strength.MySecondAttribute >= Attribute::COUNT || *strength.MySecondAttribute == strength.MyAttribute)) ||
+				(strength.MyTail && (!std::isfinite(strength.MyTail->MyValue) || std::isnan(strength.MyTail->MyUntil))))
+				throw std::invalid_argument("invalid valued buff");
 		}
+		if (_definition.MyModifiers)
+		{
+			AttributeModifiers check;
+			check.Add(*_definition.MyModifiers, _definition.MyStacks);
+		}
+		for (const auto* effects : {&_definition.MyTickEffects, &_definition.MyExpireEffects, &_definition.MyRemoveEffects})
+			for (const auto& effect : *effects)
+				if (!std::isfinite(effect.MyAmount) || effect.MyAmount < 0 ||
+					static_cast<unsigned>(effect.MyKind) > static_cast<unsigned>(BuffEffectKind::HEALTH_LOSS) ||
+					static_cast<unsigned>(effect.MyDamageType) > static_cast<unsigned>(DamageType::ELEMENTAL))
+					throw std::invalid_argument("invalid buff effect");
 	}
 
 	std::uint64_t Battle::AddBuff(UnitId _target, BuffDefinition _definition)
@@ -63,8 +69,7 @@ namespace Stronghold
 				}
 				if (_definition.MyModifiers) old.MyModifiers = std::move(_definition.MyModifiers);
 				if (_definition.MyFlags) old.MyFlags = _definition.MyFlags;
-				if (static_cast<unsigned>(_definition.MyBuiltin) > static_cast<unsigned>(BuiltinBuff::DOLL_FORM)) throw std::invalid_argument("invalid builtin buff");
-			if (_definition.MyStealthRestore) old.MyStealthRestore = _definition.MyStealthRestore;
+				if (_definition.MyStealthRestore) old.MyStealthRestore = _definition.MyStealthRestore;
 			}
 			else
 			{
@@ -127,6 +132,8 @@ namespace Stronghold
 		buffs.erase(found);
 		if (removed.MyDefinition.MyElementBurst) unit.MyElements.MyGauges.fill(0);
 		Recalculate(unit);
+		if (removed.MyDefinition.MyBuiltin == BuiltinBuff::SARGON_STACK) SyncSargon(unit.MyId);
+		if (removed.MyDefinition.MyBuiltin == BuiltinBuff::SIRACUSA_STEALTH) unit.MySiracusaStealthEnd = Time();
 		EndProfessionBuff(unit, removed.MyDefinition.MyBuiltin, false);
 		RunBuffEffects(removed.MyDefinition.MySource, _target, removed.MyDefinition.MyRemoveEffects, 1);
 		ContentEvent event{.MyKind = ContentEventKind::BUFF_REMOVED, .MyUnit = _target, .MyBuff = _buff};
@@ -135,44 +142,59 @@ namespace Stronghold
 		return true;
 	}
 
-	std::bitset<399> Battle::RangeMask(const CombatUnit& _unit, std::span<const RangeOffset> _grid, int _extend) const
+	std::bitset<399> Battle::RangeMask(WorldPoint _origin, Facing _facing, std::span<const RangeOffset> _grid, int _extend, std::vector<int>* _order) const
 	{
 		std::bitset<399> mask;
+		if (_order) { _order->clear(); _order->reserve(FieldTiles); }
+		std::array<int, 201> rowOrder; std::size_t rowCount = 0;
 		std::array<int, 201> maxima;
 		maxima.fill(std::numeric_limits<int>::min());
 		const auto add = [&](RangeOffset _offset)
 		{
-			const auto rotated = RotateOffset(_offset, _unit.MyFacing);
-			const auto row = static_cast<int>(std::floor(_unit.MyPosition.MyY + 0.5)) + rotated.MyRow;
-			const auto column = static_cast<int>(std::floor(_unit.MyPosition.MyX + 0.5)) + rotated.MyColumn;
+			const auto rotated = RotateOffset(_offset, _facing);
+			const auto row = static_cast<int>(std::floor(_origin.MyY + 0.5)) + rotated.MyRow;
+			const auto column = static_cast<int>(std::floor(_origin.MyX + 0.5)) + rotated.MyColumn;
 			if (row >= 0 && row < 19 && column >= 0 && column < 21)
-				mask.set(static_cast<std::size_t>(row * 21 + column));
+			{
+				const auto key = static_cast<std::size_t>(row * 21 + column);
+				if (_order && !mask.test(key)) _order->push_back(static_cast<int>(key));
+				mask.set(key);
+			}
 		};
 		for (const auto offset : _grid)
 		{
 			add(offset);
 			auto& maximum = maxima[static_cast<std::size_t>(offset.MyRow + 100)];
+			if (maximum == std::numeric_limits<int>::min()) rowOrder[rowCount++] = offset.MyRow;
 			maximum = std::max(maximum, offset.MyColumn);
 		}
 		// 攻击距离只从每行最远格向前延长，不补齐原范围内部的空洞。
-		for (std::size_t row = 0; row < maxima.size(); ++row)
-			if (maxima[row] != std::numeric_limits<int>::min())
-				for (int extend = 1; extend <= std::min(21, _extend); ++extend)
-					add(RangeOffset{.MyRow = static_cast<int>(row) - 100, .MyColumn = maxima[row] + extend});
+		for (std::size_t i = 0; i < rowCount; ++i)
+			for (int extend = 1; extend <= std::min(21, _extend); ++extend)
+				add(RangeOffset{.MyRow = rowOrder[i], .MyColumn = maxima[static_cast<std::size_t>(rowOrder[i] + 100)] + extend});
 		return mask;
 	}
 
 	void Battle::RefreshRange(CombatUnit& _unit)
 	{
-		_unit.MyTraitFrontMask = _unit.MyDefinition.MyTraitFrontRange ? RangeMask(_unit, *_unit.MyDefinition.MyTraitFrontRange, 0) : std::bitset<FieldTiles>{};
+		++_unit.MyRangeRevision;
+		_unit.MyTraitFrontMask = _unit.MyDefinition.MyTraitFrontRange ? RangeMask(_unit.MyPosition, _unit.MyFacing, *_unit.MyDefinition.MyTraitFrontRange, 0) : std::bitset<FieldTiles>{};
 		const auto& definition = _unit.MyDefinition.MySkill;
 		const bool active = _unit.MySkill.MyActive;
 		const auto& grid = active && !definition.MyRange.empty() ? definition.MyRange : _unit.MyDefinition.MyRange;
 		const auto extend = static_cast<int>(std::clamp<std::int64_t>((active && definition.MyNoRangeExtend ? 0LL : _unit.MyStats.MyRangeExtend) + (active ? definition.MyRangeExtend : 0LL), 0, FieldColumns));
-		_unit.MyRangeMask = RangeMask(_unit, grid, extend);
-		_unit.MyBaseRangeMask = RangeMask(_unit, _unit.MyDefinition.MyRange, _unit.MyStats.MyPermanentRangeExtend);
+		_unit.MyRangeMask = RangeMask(_unit.MyPosition, _unit.MyFacing, grid, extend, &_unit.MyRangeKeys);
+		_unit.MyBaseRangeMask = RangeMask(_unit.MyPosition, _unit.MyFacing, _unit.MyDefinition.MyRange, _unit.MyStats.MyPermanentRangeExtend);
+		const auto origin = RulePosition(_unit);
+		if (UsesInitialPosition(_unit))
+		{
+			_unit.MyInitialTraitFrontMask = _unit.MyDefinition.MyTraitFrontRange ? RangeMask(origin, _unit.MyFacing, *_unit.MyDefinition.MyTraitFrontRange, 0) : std::bitset<FieldTiles>{};
+			_unit.MyInitialRuleRangeMask = RangeMask(origin, _unit.MyFacing, grid, extend, &_unit.MyInitialRuleRangeKeys);
+			_unit.MyBaseTriggerMask = RangeMask(origin, _unit.MyFacing, _unit.MyDefinition.MyRange, _unit.MyStats.MyPermanentRangeExtend);
+		}
+		else _unit.MyBaseTriggerMask = _unit.MyBaseRangeMask;
 		const auto triggerExtend = definition.MyTrigger == SkillTrigger::ACTIVE_RANGE && !definition.MyNoRangeExtend ? _unit.MyStats.MyPermanentRangeExtend : 0;
-		_unit.MySkill.MyTriggerMask = RangeMask(_unit, definition.MyTriggerRange, triggerExtend);
+		_unit.MySkill.MyTriggerMask = RangeMask(origin, _unit.MyFacing, definition.MyTriggerRange, triggerExtend);
 	}
 
 
@@ -287,7 +309,7 @@ namespace Stronghold
 				found = std::ranges::find(unit.MyBuffs, id, &CombatBuff::MyId);
 				if (found == unit.MyBuffs.end()) continue;
 				const auto customTicks = ticks;
-				const bool custom = IsCustom(found->MyDefinition.MyContent.MyTag);
+				const bool custom = IsCustom(found->MyDefinition.MyContent.MyTag) || found->MyDefinition.MyNotifyTick;
 				if (ticks && !found->MyDefinition.MyTickEffects.empty())
 				{
 					_MyBuffTickEffects.assign(found->MyDefinition.MyTickEffects.begin(), found->MyDefinition.MyTickEffects.end());
@@ -308,6 +330,15 @@ namespace Stronghold
 				unit.MyBuffs.erase(found);
 				if (expired.MyDefinition.MyElementBurst) unit.MyElements.MyGauges.fill(0);
 				Recalculate(unit);
+				if (const auto& strength = expired.MyDefinition.MyStrength; strength && strength->MyTail &&
+					strength->MyTail->MyUntil - Time() > 1e-6 && unit.MyAlive)
+				{
+					auto resumed = *strength;
+					resumed.MyValue = strength->MyTail->MyValue; resumed.MyTail.reset();
+					(void)ApplyStrongest(unit.MyId, expired.MyDefinition.MyKey, strength->MyTail->MyUntil - Time(), resumed, source);
+				}
+				if (expired.MyDefinition.MyBuiltin == BuiltinBuff::SARGON_STACK) SyncSargon(unit.MyId);
+				if (expired.MyDefinition.MyBuiltin == BuiltinBuff::SIRACUSA_STEALTH) unit.MySiracusaStealthEnd = Time();
 				EndProfessionBuff(unit, expired.MyDefinition.MyBuiltin, true);
 				RunBuffEffects(source, unit.MyId, expired.MyDefinition.MyExpireEffects, 1);
 				ContentEvent event{.MyKind = ContentEventKind::BUFF_EXPIRED, .MyUnit = unit.MyId, .MyBuff = id};

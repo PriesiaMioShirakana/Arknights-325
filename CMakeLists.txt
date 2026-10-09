@@ -28,6 +28,30 @@ add_library(
   "${PROJECT_SOURCE_DIR}/src/content_registry.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_content.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_choices.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_bands.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_map_characters.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_egir.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_garrisons.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_generic_skill.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_operator_kits.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_operator_support.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_operator_auras.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_operator_zones.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_garrisons_events.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_garrisons_attributes.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_yan.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_yanyou.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_core_bonds.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_core_bonds_events.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_bonds.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_bonds_events.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_bonds_raid.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_strongest.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_equipment.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_equipment_periodic.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_equipment_signatures.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_equipment_hammers.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_equipment_lending.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_skills.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_elements.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_attacks.cpp"
@@ -37,6 +61,7 @@ add_library(
   "${PROJECT_SOURCE_DIR}/src/battle_displacement.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_spawns.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_tiles.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_positions.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_stealth.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_terrain.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_devices.cpp"
@@ -52,6 +77,12 @@ add_library(
   "${PROJECT_SOURCE_DIR}/src/choice_generation.cpp"
   "${PROJECT_SOURCE_DIR}/src/content_pools.cpp"
   "${PROJECT_SOURCE_DIR}/src/choice_rewards.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_items.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_bands.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_garrisons.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_bonds.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_arts.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_item_hooks.cpp"
   "${PROJECT_SOURCE_DIR}/src/final_assault.cpp"
   "${PROJECT_SOURCE_DIR}/src/boss_battle_group.cpp"
   "${PROJECT_SOURCE_DIR}/src/battle_profession_effects.cpp"
@@ -123,6 +154,8 @@ if(STRONGHOLD_BUILD_CATALOG)
     DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_ally.py"
       "${PROJECT_SOURCE_DIR}/tools/generate_roster.py"
       "${PROJECT_SOURCE_DIR}/tools/generate_profession.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_generic_skill.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_operator_kits.py"
       "${STRONGHOLD_REFERENCE_DIR}/data/backups.json"
       "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
       "${STRONGHOLD_REFERENCE_DIR}/data/chess.json"
@@ -142,7 +175,7 @@ if(STRONGHOLD_BUILD_CATALOG)
   add_custom_command(OUTPUT "${bonds_source}"
     COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_bonds.py"
       --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${bonds_source}"
-    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_bonds.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_battle_bonds.py" "${PROJECT_SOURCE_DIR}/tools/generate_bonds.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
       "${PROJECT_SOURCE_DIR}/tools/generate_match.py" "${STRONGHOLD_REFERENCE_DIR}/data/bonds.json"
       "${STRONGHOLD_REFERENCE_DIR}/data/chess.json" "${STRONGHOLD_REFERENCE_DIR}/data/items.json"
     VERBATIM)
@@ -150,8 +183,10 @@ if(STRONGHOLD_BUILD_CATALOG)
   add_custom_command(OUTPUT "${choices_source}"
     COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_choices.py"
       --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${choices_source}"
-    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_choices.py" "${PROJECT_SOURCE_DIR}/tools/generate_choice_rewards.py" "${PROJECT_SOURCE_DIR}/tools/generate_choice_battle.py" "${PROJECT_SOURCE_DIR}/tools/generate_preparation_items.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
-      "${STRONGHOLD_REFERENCE_DIR}/data/choices.json" "${STRONGHOLD_REFERENCE_DIR}/data/items.json"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_choices.py" "${PROJECT_SOURCE_DIR}/tools/generate_choice_rewards.py" "${PROJECT_SOURCE_DIR}/tools/generate_choice_battle.py" "${PROJECT_SOURCE_DIR}/tools/generate_preparation_items.py" "${PROJECT_SOURCE_DIR}/tools/generate_preparation_bands.py" "${PROJECT_SOURCE_DIR}/tools/generate_preparation_garrisons.py" "${PROJECT_SOURCE_DIR}/tools/generate_battle_garrisons.py" "${PROJECT_SOURCE_DIR}/tools/generate_preparation_bonds.py" "${PROJECT_SOURCE_DIR}/tools/generate_band_battle.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_equipment.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/choices.json" "${STRONGHOLD_REFERENCE_DIR}/data/items.json" "${STRONGHOLD_REFERENCE_DIR}/data/bands.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/garrisons.json" "${STRONGHOLD_REFERENCE_DIR}/data/chess.json" "${STRONGHOLD_REFERENCE_DIR}/data/bonds.json"
       "${STRONGHOLD_REFERENCE_DIR}/data/enemies.json" "${STRONGHOLD_REFERENCE_DIR}/data/effects.json"
     VERBATIM)
   add_custom_command(OUTPUT "${match_source}"
@@ -167,11 +202,14 @@ if(STRONGHOLD_BUILD_CATALOG)
     DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_wave_generation.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
       "${STRONGHOLD_REFERENCE_DIR}/data/config.json" "${STRONGHOLD_REFERENCE_DIR}/data/factions.json"
       "${STRONGHOLD_REFERENCE_DIR}/data/enemies.json" "${STRONGHOLD_REFERENCE_DIR}/data/stages.json"
-      "${STRONGHOLD_REFERENCE_DIR}/data/bosses.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/bosses.json" "${STRONGHOLD_REFERENCE_DIR}/data/bands.json"
     VERBATIM)
-  add_library(stronghold_catalog "${wave_generation_source}" "${PROJECT_SOURCE_DIR}/src/wave_generation.cpp" "${PROJECT_SOURCE_DIR}/src/wave_extras.cpp" "${catalog_source}" "${combat_source}" "${ally_source}" ${ally_shards} "${PROJECT_SOURCE_DIR}/src/reference_ally.cpp" "${PROJECT_SOURCE_DIR}/src/reference_stage.cpp" "${PROJECT_SOURCE_DIR}/src/reference_wave.cpp")
+  add_library(stronghold_catalog "${wave_generation_source}" "${PROJECT_SOURCE_DIR}/src/wave_generation.cpp" "${PROJECT_SOURCE_DIR}/src/wave_extras.cpp" "${PROJECT_SOURCE_DIR}/src/wave_ducks.cpp" "${catalog_source}" "${combat_source}" "${ally_source}" ${ally_shards} "${PROJECT_SOURCE_DIR}/src/reference_ally.cpp" "${PROJECT_SOURCE_DIR}/src/reference_stage.cpp" "${PROJECT_SOURCE_DIR}/src/reference_wave.cpp")
   # MSVC's debug constant evaluation can use substantial memory for roster tables.
-  target_sources(stronghold_catalog PRIVATE "${match_source}")
+  target_sources(stronghold_catalog PRIVATE "${match_source}" "${PROJECT_SOURCE_DIR}/src/reference_match_setup.cpp" "${PROJECT_SOURCE_DIR}/src/reference_map_characters.cpp"
+    "${PROJECT_SOURCE_DIR}/src/reference_summons.cpp" "${PROJECT_SOURCE_DIR}/src/reference_generic_skill.cpp" "${PROJECT_SOURCE_DIR}/src/reference_operator_kit.cpp")
+  target_sources(stronghold_catalog PRIVATE "${PROJECT_SOURCE_DIR}/src/reference_equipment.cpp")
+  target_sources(stronghold_catalog PRIVATE "${PROJECT_SOURCE_DIR}/src/local_match.cpp" "${PROJECT_SOURCE_DIR}/src/local_match_battle.cpp")
   target_sources(stronghold_catalog PRIVATE "${roster_source}" "${PROJECT_SOURCE_DIR}/src/reference_roster.cpp")
   target_sources(stronghold_catalog PRIVATE "${choices_source}" "${bonds_source}" "${PROJECT_SOURCE_DIR}/src/reference_preparation.cpp" "${PROJECT_SOURCE_DIR}/src/reference_choice_effects.cpp")
   # Keep the data in separate source files and bound simultaneous compilers on Ninja/VS CMake.
@@ -181,6 +219,12 @@ if(STRONGHOLD_BUILD_CATALOG)
   target_link_libraries(stronghold_catalog PUBLIC Stronghold::Core)
   add_executable(stronghold_cli "${PROJECT_SOURCE_DIR}/apps/main.cpp")
   target_link_libraries(stronghold_cli PRIVATE stronghold_catalog)
+  if(BUILD_TESTING)
+    add_executable(stronghold_local_match_tests "${PROJECT_SOURCE_DIR}/tests/local_match_tests.cpp")
+    target_link_libraries(stronghold_local_match_tests PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_local_match_tests)
+    add_test(NAME local_match_core COMMAND stronghold_local_match_tests)
+  endif()
   stronghold_warnings(stronghold_cli)
 endif()
 
@@ -205,10 +249,34 @@ if(BUILD_TESTING)
   target_link_libraries(stronghold_content_tests PRIVATE Stronghold::Core)
   stronghold_warnings(stronghold_content_tests)
   add_test(NAME content_core COMMAND stronghold_content_tests)
+  add_executable(stronghold_preparation_garrisons_tests "${PROJECT_SOURCE_DIR}/tests/preparation_garrisons_tests.cpp")
+  target_link_libraries(stronghold_preparation_garrisons_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_preparation_garrisons_tests)
+  add_test(NAME preparation_garrisons_core COMMAND stronghold_preparation_garrisons_tests)
+  add_executable(stronghold_preparation_bonds_tests "${PROJECT_SOURCE_DIR}/tests/preparation_bonds_tests.cpp")
+  target_link_libraries(stronghold_preparation_bonds_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_preparation_bonds_tests)
+  add_test(NAME preparation_bonds_core COMMAND stronghold_preparation_bonds_tests)
+  add_executable(stronghold_preparation_bands_tests "${PROJECT_SOURCE_DIR}/tests/preparation_bands_tests.cpp")
+  target_link_libraries(stronghold_preparation_bands_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_preparation_bands_tests)
+  add_test(NAME preparation_bands_core COMMAND stronghold_preparation_bands_tests)
+  add_executable(stronghold_preparation_items_tests "${PROJECT_SOURCE_DIR}/tests/preparation_items_tests.cpp")
+  target_link_libraries(stronghold_preparation_items_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_preparation_items_tests)
+  add_test(NAME preparation_items_core COMMAND stronghold_preparation_items_tests)
   add_executable(stronghold_skill_tests "${PROJECT_SOURCE_DIR}/tests/skill_tests.cpp")
   target_link_libraries(stronghold_skill_tests PRIVATE Stronghold::Core)
   stronghold_warnings(stronghold_skill_tests)
   add_test(NAME skill_core COMMAND stronghold_skill_tests)
+  add_executable(stronghold_position_rules_tests "${PROJECT_SOURCE_DIR}/tests/position_rules_tests.cpp")
+  target_link_libraries(stronghold_position_rules_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_position_rules_tests)
+  add_test(NAME position_rules_core COMMAND stronghold_position_rules_tests)
+  add_executable(stronghold_operator_kits_tests "${PROJECT_SOURCE_DIR}/tests/operator_kits_tests.cpp")
+  target_link_libraries(stronghold_operator_kits_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_operator_kits_tests)
+  add_test(NAME operator_kits_core COMMAND stronghold_operator_kits_tests)
   add_executable(stronghold_element_tests "${PROJECT_SOURCE_DIR}/tests/element_tests.cpp")
   target_link_libraries(stronghold_element_tests PRIVATE Stronghold::Core)
   stronghold_warnings(stronghold_element_tests)
@@ -244,6 +312,9 @@ if(BUILD_TESTING)
     add_executable(stronghold_choice_rewards_probe "${PROJECT_SOURCE_DIR}/tests/choice_rewards_probe.cpp")
     target_link_libraries(stronghold_choice_rewards_probe PRIVATE stronghold_catalog)
     stronghold_warnings(stronghold_choice_rewards_probe)
+    add_executable(stronghold_preparation_items_probe "${PROJECT_SOURCE_DIR}/tests/preparation_items_probe.cpp")
+    target_link_libraries(stronghold_preparation_items_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_preparation_items_probe)
     add_executable(stronghold_content_pools_probe "${PROJECT_SOURCE_DIR}/tests/content_pools_probe.cpp")
     target_link_libraries(stronghold_content_pools_probe PRIVATE stronghold_catalog)
     stronghold_warnings(stronghold_content_pools_probe)
@@ -284,8 +355,142 @@ if(BUILD_TESTING)
     target_link_libraries(stronghold_wave_catalog_probe PRIVATE stronghold_catalog)
     stronghold_warnings(stronghold_wave_catalog_probe)
     add_test(NAME catalog_smoke COMMAND stronghold_cli catalog)
+    add_executable(stronghold_match_setup_probe "${PROJECT_SOURCE_DIR}/tests/match_setup_probe.cpp")
+    target_link_libraries(stronghold_match_setup_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_match_setup_probe)
+    add_executable(stronghold_local_match_probe "${PROJECT_SOURCE_DIR}/tests/local_match_probe.cpp")
+    target_link_libraries(stronghold_local_match_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_local_match_probe)
+    add_executable(stronghold_wave_ducks_probe "${PROJECT_SOURCE_DIR}/tests/wave_ducks_probe.cpp")
+    target_link_libraries(stronghold_wave_ducks_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_wave_ducks_probe)
+    add_executable(stronghold_battle_bands_probe "${PROJECT_SOURCE_DIR}/tests/battle_bands_probe.cpp")
+    target_link_libraries(stronghold_battle_bands_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_battle_bands_probe)
+    add_executable(stronghold_map_characters_probe "${PROJECT_SOURCE_DIR}/tests/map_characters_probe.cpp")
+    target_link_libraries(stronghold_map_characters_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_map_characters_probe)
+    add_executable(stronghold_equipment_stats_probe "${PROJECT_SOURCE_DIR}/tests/equipment_stats_probe.cpp")
+    target_link_libraries(stronghold_equipment_stats_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_equipment_stats_probe)
+    add_executable(stronghold_equipment_effects_probe "${PROJECT_SOURCE_DIR}/tests/equipment_effects_probe.cpp")
+    target_link_libraries(stronghold_equipment_effects_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_equipment_effects_probe)
+    add_executable(stronghold_battle_garrisons_probe tests/battle_garrisons_probe.cpp)
+    add_executable(stronghold_generic_skill_probe tests/generic_skill_probe.cpp)
+    add_executable(stronghold_operator_kits_probe tests/operator_kits_probe.cpp)
+    target_link_libraries(stronghold_operator_kits_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_operator_kits_probe)
+    target_link_libraries(stronghold_generic_skill_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_generic_skill_probe)
+    target_link_libraries(stronghold_battle_garrisons_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_battle_garrisons_probe)
+    add_executable(stronghold_yanyou_probe tests/yanyou_probe.cpp)
+    target_link_libraries(stronghold_yanyou_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_yanyou_probe)
+    add_executable(stronghold_siracusa_probe tests/siracusa_probe.cpp)
+    target_link_libraries(stronghold_siracusa_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_siracusa_probe)
+    add_executable(stronghold_egir_probe tests/egir_probe.cpp)
+    target_link_libraries(stronghold_egir_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_egir_probe)
+    add_executable(stronghold_core_bonds_probe tests/core_bonds_probe.cpp)
+    target_link_libraries(stronghold_core_bonds_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_core_bonds_probe)
+    add_executable(stronghold_battle_bonds_probe tests/battle_bonds_probe.cpp)
+    target_link_libraries(stronghold_battle_bonds_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_battle_bonds_probe)
     find_program(STRONGHOLD_NODE node)
     if(STRONGHOLD_NODE)
+      add_test(NAME map_characters_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/map_characters_parity.mjs"
+        --native $<TARGET_FILE:stronghold_map_characters_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME equipment_stats_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/equipment_stats_parity.mjs"
+        --native $<TARGET_FILE:stronghold_equipment_stats_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME equipment_effects_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/equipment_effects_parity.mjs"
+        --native $<TARGET_FILE:stronghold_equipment_effects_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME equipment_hammers_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/equipment_effects_parity.mjs" --hammers
+        --native $<TARGET_FILE:stronghold_equipment_effects_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      foreach(quality IN ITEMS a b)
+        add_test(NAME equipment_lending_${quality}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/equipment_effects_parity.mjs" --lending --quality ${quality}
+          --native $<TARGET_FILE:stronghold_equipment_effects_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      endforeach()
+      add_test(NAME preparation_bonds_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/preparation_bonds_parity.mjs"
+        --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME battle_garrisons_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/battle_garrisons_parity.mjs"
+        --native $<TARGET_FILE:stronghold_battle_garrisons_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME generic_skill_catalog_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/generic_skill_parity.mjs" --catalog
+        --native $<TARGET_FILE:stronghold_generic_skill_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME generic_skill_professions_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/generic_skill_parity.mjs" --professions --seed 1
+        --native $<TARGET_FILE:stronghold_generic_skill_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      foreach(seed IN ITEMS 1 42)
+        add_test(NAME operator_kits_${seed}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/operator_kits_parity.mjs" --seed ${seed}
+          --native $<TARGET_FILE:stronghold_operator_kits_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+        add_test(NAME generic_skill_${seed}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/generic_skill_parity.mjs" --seed ${seed}
+          --native $<TARGET_FILE:stronghold_generic_skill_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      endforeach()
+      add_test(NAME yanyou_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/yanyou_parity.mjs"
+        --native $<TARGET_FILE:stronghold_yanyou_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME siracusa_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/siracusa_parity.mjs"
+        --native $<TARGET_FILE:stronghold_siracusa_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME egir_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/egir_parity.mjs"
+        --native $<TARGET_FILE:stronghold_egir_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME core_bonds_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/core_bonds_parity.mjs"
+        --native $<TARGET_FILE:stronghold_core_bonds_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME battle_bonds_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/battle_bonds_parity.mjs"
+        --native $<TARGET_FILE:stronghold_battle_bonds_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME battle_bands_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/battle_bands_parity.mjs"
+        --native $<TARGET_FILE:stronghold_battle_bands_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME local_match_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/local_match_parity.mjs"
+        --native $<TARGET_FILE:stronghold_local_match_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME wave_ducks_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/wave_ducks_parity.mjs"
+        --native $<TARGET_FILE:stronghold_wave_ducks_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME match_setup_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/match_setup_parity.mjs"
+        --native $<TARGET_FILE:stronghold_match_setup_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME preparation_garrisons_lisa_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/preparation_garrisons_parity.mjs" --lisa
+        --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      foreach(garrison_group RANGE 0 3)
+        add_test(NAME preparation_bonds_garrisons_${garrison_group}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/preparation_garrisons_parity.mjs" --bonds --group "${garrison_group}"
+          --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+        add_test(NAME preparation_garrisons_${garrison_group}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/preparation_garrisons_parity.mjs" --group "${garrison_group}"
+          --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      endforeach()
+      foreach(band_group IN ITEMS 1 42 4294967295 mode_single_normal mode_multi_funny)
+        add_test(NAME preparation_bands_${band_group}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/preparation_bands_parity.mjs" --group "${band_group}"
+          --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      endforeach()
+      add_test(NAME preparation_items_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/preparation_items_parity.mjs"
+        --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME preparation_arts_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/preparation_items_parity.mjs" --arts-only
+        --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME preparation_item_hooks_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/preparation_items_parity.mjs" --hooks-only
+        --native $<TARGET_FILE:stronghold_preparation_items_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
       add_test(NAME choice_battle_javascript_parity COMMAND "${STRONGHOLD_NODE}"
         "${PROJECT_SOURCE_DIR}/tests/choice_battle_parity.mjs"
         --native $<TARGET_FILE:stronghold_choice_battle_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")

@@ -1,5 +1,6 @@
 #include <limits>
 #include <stronghold/domain/preparation.hpp>
+#include "preparation_hooks.hpp"
 
 namespace Stronghold
 {
@@ -86,20 +87,42 @@ namespace Stronghold
 		return matches;
 	}
 
+	std::string EconomySession::GrantDefinition(PlayerView& _view, PieceUid _uid, std::string_view _fallback,
+		std::span<const EconomyEvent> _events) const
+	{
+		if (const auto location = Locate(_view, _uid)) return location->Get(_view).MyId;
+		// 获得时的连锁赠送可能再次合成来源；收据仍报告本次获得的身份。
+		for (auto it = _events.rbegin(); it != _events.rend(); ++it)
+			if (it->MyUid == _uid && !it->MyDefinitionId.empty()) return it->MyDefinitionId;
+		return std::string(_fallback);
+	}
+
 	std::optional<PieceUid> EconomySession::Acquire(Player& _player, const Definition& _definition, std::vector<EconomyEvent>& _events, GrantOptions _options)
 	{
 		auto& view = _player.MyView;
 		if (!Selected(view, _definition)) return {};
 		if (_definition.MyKind == PieceKind::CHESS) ++view.MyRoundStatistics.MyGainedChess;
-		Piece piece{.MyUid = ++_MyNextUid, .MyId = _definition.MyId, .MyDeferredMerge = _definition.MyKind == PieceKind::ITEM && _options.MyDeferItemMerge};
+		Piece piece{.MyUid = ++_MyNextUid, .MyId = _definition.MyId, .MyDeferredMerge = _definition.MyKind == PieceKind::ITEM && (_options.MyDeferItemMerge || (_MyHooks && _MyHooks->MyPrepEndDepth > 0))};
 		if (_definition.MyKind == PieceKind::CHESS && _options.MyFromPool)
 			piece.MyPoolCopies = TakeCopies(_player, _definition.MyBaseId, _definition.MyGolden ? _MyRules.MyGoldenCopies : 1);
+		std::optional<PieceUid> uid;
 		if (!piece.MyDeferredMerge && _definition.MyMergeCount > 1 && MergeLocations(view, _definition).size() + 1 >= static_cast<std::size_t>(_definition.MyMergeCount))
-			return MergePieces(_player, _definition, std::move(piece), _events);
-		const auto uid = piece.MyUid;
-		if (Stow(view, piece, _options.MyToTemporary)) return uid;
-		if (piece.MyPoolCopies) (void)ReturnCopies(_player, _definition.MyBaseId, piece.MyPoolCopies);
-		return {};
+			uid = MergePieces(_player, _definition, std::move(piece), _events);
+		else
+		{
+			const auto incoming = piece.MyUid;
+			if (Stow(view, piece, _options.MyToTemporary)) uid = incoming;
+			else if (piece.MyPoolCopies) (void)ReturnCopies(_player, _definition.MyBaseId, piece.MyPoolCopies);
+		}
+		if (uid && _MyHooks)
+		{
+			LiftOutOfRange(_player); FillHand(view);
+			_MyHooks->Acquired(*this, view.MyPlayerId, *uid, _events);
+			LiftOutOfRange(_player); FillHand(view);
+			if (_definition.MyKind == PieceKind::CHESS)
+				_MyHooks->RefreshBonds(*this, static_cast<std::size_t>(&_player - _MyPlayers.data()));
+		}
+		return uid;
 	}
 
 	std::optional<PieceUid> EconomySession::MergePieces(Player& _player, const Definition& _definition, std::optional<Piece> _incoming, std::vector<EconomyEvent>& _events)
@@ -162,6 +185,7 @@ namespace Stronghold
 			if (location && location->MyOnBoard) GrantTokens(_player, location->Get(view));
 			QueueReward(_player);
 		}
+		if (_MyHooks) _MyHooks->Merged(*this, view.MyPlayerId, _events);
 		return uid;
 	}
 
@@ -204,8 +228,8 @@ namespace Stronghold
 		next.LiftOutOfRange(player); next.FillHand(player.MyView);
 		if (result.MyPiece)
 		{
-			const auto& piece = Locate(player.MyView, *result.MyPiece)->Get(player.MyView);
-			result.MyChanges.MyEvents.emplace_back(EconomyEvent{.MyKind = EventKind::GRANTED, .MyDefinitionId = piece.MyId, .MyUid = piece.MyUid});
+			result.MyChanges.MyEvents.emplace_back(EconomyEvent{.MyKind = EventKind::GRANTED,
+				.MyDefinitionId = next.GrantDefinition(player.MyView, *result.MyPiece, definition->MyId, result.MyChanges.MyEvents), .MyUid = *result.MyPiece});
 		}
 		result.MyChanges.MyRevision = ++next._MyRevision; Commit(std::move(next)); return result;
 	}

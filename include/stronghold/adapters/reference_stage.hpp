@@ -33,6 +33,12 @@ namespace Stronghold
 		std::vector<TurretSpawn> MyTurrets{};
 	};
 
+	struct StageMapCharacter
+	{
+		std::string_view MyId{};
+		MapCharacterTile MyTile{};
+	};
+
 	struct StageRecord
 	{
 		std::string_view MyId{};
@@ -40,6 +46,7 @@ namespace Stronghold
 		std::span<const FieldTile> MyTiles{};
 		TerrainRules MyRules{};
 		std::span<const StageDeviceRecord> MyDevices{};
+		std::span<const StageMapCharacter> MyMapCharacters{};
 
 		// 一次建局解析：返回值拥有可变地图/装置，之后的热路径不查询黑板或 JSON。
 		[[nodiscard]] StageSetup Prepare(FieldRect _rect, std::span<const BattlePlayerInput> _players,

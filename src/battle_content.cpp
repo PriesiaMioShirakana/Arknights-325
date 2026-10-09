@@ -39,8 +39,42 @@ namespace Stronghold
 
 	void Battle::NotifyContent(ContentEvent& _event)
 	{
-		NotifyProfession(_event);
-		if (_MyContentInstances.empty()) { NotifyChoices(_event); NotifyProfessionLate(_event); return; }
+		NotifyGenericSkill(_event);
+		if ((_event.MyKind == ContentEventKind::DEPLOY || _event.MyKind == ContentEventKind::DEATH) && _event.MyUnit && Unit(_event.MyUnit).MyKind == UnitKind::OPERATOR)
+			for (auto& field : _MyHammerFields) field.MyAt = -std::numeric_limits<double>::infinity();
+		// 原版被动技能只执行自己的 onStart，不广播全局 skillStart。
+		const bool ownSkillEvent = _event.MyKind >= ContentEventKind::SKILL_START && _event.MyKind <= ContentEventKind::SKILL_TICK;
+		if (ownSkillEvent) NotifyYanyou(_event);
+		const bool passiveStart = _event.MyKind == ContentEventKind::SKILL_START && _event.MySkillReason == SkillReason::PASSIVE;
+		if (passiveStart) NotifyMedics(_event);
+		else
+		{
+			NotifyProfession(_event);
+			NotifyOperatorKits(_event);
+			NotifyEquipment(_event, true);
+			NotifyBands(_event, true);
+			NotifyEgirDeath(_event);
+			NotifyIndomitable(_event);
+			NotifyCoreBonds(_event);
+			NotifyAddonBonds(_event);
+			NotifyGarrisons(_event);
+			NotifyMedics(_event);
+			NotifyEquipment(_event, false);
+			if (!ownSkillEvent && _event.MyKind != ContentEventKind::TICK) NotifyYanyou(_event);
+		}
+		if (_MyContentInstances.empty())
+		{
+			if (!passiveStart)
+			{
+				NotifyBands(_event, false); NotifyChoices(_event);
+				if (_event.MyKind == ContentEventKind::TICK) NotifyYanyou(_event);
+				HammerFatal(_event, true); NotifyProfessionLate(_event); HammerFatal(_event, false);
+				NotifyMedics(_event, true);
+				NotifyGarrisons(_event, true); NotifyEquipmentLate(_event); NotifyCoreBonds(_event, true); NotifyAddonBonds(_event, true);
+			}
+			else NotifyMedics(_event, true);
+			return;
+		}
 		constexpr unsigned DepthLimit = 32;
 		if (_MyContentDepth == DepthLimit) throw std::runtime_error("custom content recursion limit");
 		++_MyContentDepth;
@@ -51,6 +85,7 @@ namespace Stronghold
 			const auto& instance = _MyContentInstances[i];
 			if (instance.MyRetired || !instance.MyHandler) continue;
 			const auto tag = instance.MyReference.MyTag;
+			if (passiveStart && (instance.MyUnit != _event.MyUnit || tag == ContentTag::CUSTOM_BUFF)) continue;
 			const bool buffEvent = _event.MyKind >= ContentEventKind::BUFF_APPLIED && _event.MyKind <= ContentEventKind::BUFF_EXPIRED;
 			if (tag == ContentTag::CUSTOM_BUFF)
 			{
@@ -73,8 +108,15 @@ namespace Stronghold
 			catch (const std::exception& error) { RecordContentError(reference, error.what()); }
 			catch (...) { RecordContentError(reference, "unknown custom content exception"); }
 		}
-		NotifyChoices(_event);
-		NotifyProfessionLate(_event);
+		if (!passiveStart)
+		{
+			NotifyBands(_event, false); NotifyChoices(_event);
+			if (_event.MyKind == ContentEventKind::TICK) NotifyYanyou(_event);
+			HammerFatal(_event, true); NotifyProfessionLate(_event); HammerFatal(_event, false);
+			NotifyMedics(_event, true);
+			NotifyGarrisons(_event, true); NotifyEquipmentLate(_event); NotifyCoreBonds(_event, true); NotifyAddonBonds(_event, true);
+		}
+		else NotifyMedics(_event, true);
 		--_MyContentDepth;
 		if (_MyContentDepth == 0)
 			std::erase_if(_MyContentInstances, [](const ContentInstance& _instance) { return _instance.MyRetired; });

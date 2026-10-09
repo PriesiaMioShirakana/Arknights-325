@@ -34,7 +34,9 @@ int main()
 			std::cout << "]]";
 		}
 		std::cout << "],[" << m.MyInformationSeconds << ',' << m.MyBattleCheckSeconds << ',' << strategy.MyTurnSeconds << ',' << strategy.MySkips << ',' << std::quoted(strategy.MyDefaultId)
-			<< ',' << m.MySpecialDraft.MyFirstTurnSeconds << ',' << m.MySpecialDraft.MyTurnSeconds << ',' << m.MyLifeCapPerRound << "],[";
+			<< ',' << m.MySpecialDraft.MyFirstTurnSeconds << ',' << m.MySpecialDraft.MyTurnSeconds << ',' << m.MyLifeCapPerRound
+			<< ',' << m.MyDisabledCoreBonds << ',' << m.MyDisabledAddonBonds << ',' << m.MyMaxUniteHelpers
+			<< ',' << m.MyInitialDp << ',' << m.MyDpPerSecond << ',' << m.MyMaxDp << "],[";
 		for (std::size_t i = 0; i <= m.MyBosses.size(); ++i)
 		{
 			if (i) std::cout << ',';

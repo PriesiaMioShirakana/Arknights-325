@@ -59,7 +59,7 @@ namespace Stronghold
 		gauge = std::min(GaugeMaximum(target), gauge + amount);
 		if (_source) _MyUnits[Index(_source)].MyTotals.MyElementDamage += amount;
 		ContentEvent event{.MyKind = ContentEventKind::DAMAGED, .MySource = _source, .MyTarget = _target,
-			.MyAmount = amount, .MyElement = _hit.MyElement};
+			.MyAmount = amount, .MyDamage = DamageInfo{.MyTags = _hit.MyTags}, .MyElement = _hit.MyElement};
 		NotifyContent(event);
 		// 元素损伤不触发受击 SP；爆发产生的 HP 伤害才会通过普通伤害管线触发。
 		if (target.MyAlive && std::isgreaterequal(gauge, GaugeMaximum(target))) BurstElement(_source, _target, _hit.MyElement);
@@ -141,7 +141,8 @@ namespace Stronghold
 		// DealDamage 的内容回调可能删掉当前 Buff；从此处起不再读取 _buff。
 		const auto type = element == Element::NECROSIS ? DamageType::TRUE_DAMAGE : enemy ? DamageType::ELEMENTAL : DamageType::ARTS;
 		(void)DealDamage(source, _unit.MyId, DamageInfo{.MyAmount = element == Element::APOPTOSIS && enemy ? 800.0 : 100.0,
-			.MyType = type, .MyCanDodge = false, .MySourceless = true});
+			.MyType = type, .MyCanDodge = false, .MySourceless = true,
+			.MyTags = DamageTag::BURST | (element == Element::NECROSIS ? DamageTag::NECROSIS : DamageTag::APOPTOSIS)});
 	}
 
 	double Battle::ReduceElement(UnitId _target, double _amount, std::optional<Element> _element)

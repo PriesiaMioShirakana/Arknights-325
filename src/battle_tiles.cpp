@@ -11,7 +11,7 @@ namespace Stronghold
 	bool Battle::IsDown(UnitId _unit) const
 	{
 		const auto& unit = Unit(_unit);
-		return unit.MySide == UnitSide::ALLY && unit.MyKind == UnitKind::OPERATOR && !unit.MyAlive && !unit.MyRemoved &&
+		return unit.MySide == UnitSide::ALLY && unit.MyKind == UnitKind::OPERATOR && !unit.MyAlive && !unit.MyRemoved && unit.MyRemovalReason != RemovalReason::RAID &&
 			unit.MyDeploySequence && std::isfinite(unit.MyRespawnAt);
 	}
 

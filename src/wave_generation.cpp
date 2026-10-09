@@ -261,11 +261,12 @@ namespace Stronghold
 			definition.MyStats.MyResistance *= spec.MyScale.MyResistance;
 			constexpr std::array<std::string_view, 9> Slots{"", "N", "E", "S", "NF", "EF", "SF", "T", "TF"};
 			if (static_cast<std::size_t>(spec.MySlot) >= Slots.size()) throw std::invalid_argument("invalid wave slot");
-			const auto mods = spec.MyOriginalModifiers.value_or(EnemySpawnModifiers{
+			auto mods = spec.MyOriginalModifiers.value_or(EnemySpawnModifiers{
 				.MyHealth = spec.MyTag == EnemySpawnTag::BOSS ? std::nullopt : std::optional(spec.MyScale.MyHealth),
 				.MyAttack = spec.MyScale.MyAttack, .MyDefense = spec.MyScale.MyDefense, .MyResistance = spec.MyScale.MyResistance,
 				.MySpeed = spec.MyScale.MySpeed, .MySupplyHealth = spec.MyScale.MySupplyHealth,
 				.MySlot = std::string(Slots[static_cast<std::size_t>(spec.MySlot)]), .MyBountyId = spec.MyBountyId});
+			if (spec.MyCoins > 0 && mods.MyBountyId.empty() && !mods.MyBountyCoins) mods.MyBountyCoins = spec.MyCoins;
 			const auto reward = spec.MyCoins > 0 ? std::optional(BountyReward{.MyCoins = static_cast<double>(spec.MyCoins), .MyOwnerId = spec.MyRewardOwner}) : std::nullopt;
 			const auto compiled = route.Compile(_rect);
 			for (unsigned n = 0; n < spec.MyCount; ++n)

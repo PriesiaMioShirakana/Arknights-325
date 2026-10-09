@@ -90,6 +90,11 @@ namespace Stronghold
 		std::string_view MyBondId{};
 		std::string_view MyReason{};
 		std::optional<WorldPoint> MySourceTile{};
+		bool MyDying{};
+		std::span<const UnitId> MyTargets{}; // 仅本次攻击回调借用；保留主攻击的目标次序。
+		bool MyEquipmentSilenced{};
+		bool MyStatusEntered{};
+		bool MyRevived{}; // 成功的装备／战略复活不占用阿戈尔首次击倒名额。
 	};
 
 	// 多态只存在于 CUSTOM 实例中：内置单位不创建该对象，也不经由此接口行动。

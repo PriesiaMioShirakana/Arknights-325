@@ -83,10 +83,12 @@ namespace Stronghold
 		// 返回值独立拥有 ID，静态数据不被一局战斗的属性修改污染。
 		[[nodiscard]] CombatDefinition MakeDefinition() const
 		{
-			return CombatDefinition{.MyId = std::string(MyId), .MyStats = MyStats, .MyAttack = MyAttack,
+			auto result = CombatDefinition{.MyId = std::string(MyId), .MyStats = MyStats, .MyAttack = MyAttack,
 				.MyRange = {}, .MyFlying = MyFlying, .MyBlockWeight = MyBlockWeight,
 				.MyImmunities = StatusFlags(MyImmunities), .MyLeader = MyRank == EnemyRank::BOSS,
 				.MyStaticBody = MyStaticBody, .MyElite = MyRank == EnemyRank::ELITE, .MyHitArea = MyHitArea};
+			result.MyEnemyTags.assign(MyTags.begin(), MyTags.end());
+			return result;
 		}
 	};
 

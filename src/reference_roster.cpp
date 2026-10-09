@@ -241,7 +241,8 @@ namespace Stronghold
 		for (const auto& record : ReferenceOperators())
 		{
 			const auto resolved = Resolve(record.MyId);
-			result.emplace_back(ContentPoolRoster{.MyId = record.MyId, .MyBonds = resolved.MyBonds});
+			result.emplace_back(ContentPoolRoster{.MyId = record.MyId, .MyBonds = resolved.MyBonds,
+				.MyGarrisons = resolved.MyDiySelected ? std::span<const std::string_view>{} : record.MyGarrisons});
 		}
 		return result;
 	}
