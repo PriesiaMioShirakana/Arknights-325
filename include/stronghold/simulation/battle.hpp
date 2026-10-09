@@ -153,6 +153,9 @@ namespace Stronghold
 
 		// 创建返回稳定 ID；非法定义抛异常，合法但被占位／倒地体拒绝的召唤返回 0。
 		UnitId SpawnToken(TokenSpawn _spawn);
+		// 技能库存只会激活已布置且来源为 SKILL 的棋盘召唤物；没有棋子时不生成库存。
+		UnitId ReleaseSkillSummon(UnitId _owner, std::string_view _token, unsigned _cap = 1);
+		[[nodiscard]] unsigned SkillSummonStock(UnitId _owner, std::string_view _token) const;
 		UnitId SpawnDevice(DeviceSpawn _spawn);
 		// 炮台别名局内唯一，重复激活返回原 ID；找不到有效射程/空位时返回 0。
 		UnitId SpawnTurret(TurretSpawn _spawn);
@@ -200,12 +203,14 @@ namespace Stronghold
 		void NotifyMedics(ContentEvent& _event, bool _late = false);
 		void NotifyGenericSkill(ContentEvent& _event);
 		void InstallOperatorKit(CombatUnit& _unit);
+		void ReleaseOperatorHooks();
+		void NotifyOperatorEarly(ContentEvent& _event);
 		void NotifyOperatorKits(ContentEvent& _event);
 		bool OperatorBeforeAttack(CombatUnit& _unit, std::vector<UnitId>& _targets);
-		void OperatorAfterHit(UnitId _source, UnitId _target);
-		[[nodiscard]] bool OperatorCanAttack(const CombatUnit& _unit) const;
+		void OperatorAfterHit(UnitId _source, UnitId _target, const AttackProfile& _profile, WorldPoint _point, double _dealt);
+		[[nodiscard]] bool OperatorCanAttack(const CombatUnit& _unit);
 		void SortOperatorTargets(UnitId _source, std::vector<UnitId>& _targets, unsigned _limit = 0, const AttackProfile* _profile = nullptr);
-		void OperatorEnemiesInGrid(UnitId _source, std::span<const RangeOffset> _grid, std::vector<UnitId>& _targets);
+		void OperatorEnemiesInGrid(UnitId _source, std::span<const RangeOffset> _grid, std::vector<UnitId>& _targets, bool _sort = true);
 		[[nodiscard]] UnitId HighestHealthAllyInRange(UnitId _source) const;
 		void NotifyVendlas(ContentEvent& _event);
 		void TexasSkill(UnitId _unit, const TexasKit& _kit);
@@ -214,7 +219,79 @@ namespace Stronghold
 		void OperatorReveal(UnitId _unit);
 		void NotifyOperatorObservers(ContentEvent& _event);
 		[[nodiscard]] bool OperatorInGrid(UnitId _source, UnitId _target, std::span<const RangeOffset> _grid) const;
-		void PodegoAura(UnitId _unit);
+
+		enum class OperatorAuraStacking { STRONGEST, PER_SOURCE, REPLACE, STRONGEST_LIVING, HIGHEST_PRESENT };
+
+		enum class OperatorAuraValue { FIXED, SOURCE_ATTACK };
+
+		struct OperatorAuraDefinition
+		{
+			std::string_view MyKey{};
+			Attribute MyAttribute{Attribute::ATTACK_PERCENT};
+			double MyValue{};
+			OperatorAuraValue MyValueFrom{OperatorAuraValue::FIXED};
+			OperatorAuraStacking MyStacking{OperatorAuraStacking::STRONGEST};
+			std::optional<OperatorProfession> MyProfession{};
+			std::optional<double> MyCostLimit{};
+			double MyInterval{0.5};
+			double MyInitialDelay{};
+			double MyDuration{0.6};
+			std::span<const RangeOffset> MyRange{};
+			std::span<const RangeOffset> MySkillRange{};
+			double MySkillScale{1};
+			bool MyOperatorsOnly{};
+			bool MyMeleeOnly{};
+			bool MyDropOutside{};
+			bool MySkillInactive{};
+			bool MySkillActive{};
+			bool MyEnemies{};
+			bool MyNormalEnemies{};
+			bool MyAttackRange{};
+			bool MySkipHidden{};
+			std::optional<double> MyHealthRatioBelow{};
+			std::span<const AttributeChange> MyModifiers{};
+			BuffRefresh MyRefresh{BuffRefresh::REPLACE};
+			bool MyOwnerOnly{};
+			std::optional<double> MyMinimum{};
+			std::optional<CombatStatus> MyStatus{};
+			std::string_view MyRequiredBuff{};
+			bool MySkipSelf{};
+			bool MyIgnoreIsolation{};
+			std::span<const std::string_view> MyCharacters{};
+			std::string_view MyGroup{};
+			std::string_view MyNation{};
+			bool MyNoSource{};
+		};
+
+		struct OperatorAuraRuntime
+		{
+			UnitId MySource{};
+			OperatorAuraDefinition MyDefinition{};
+			std::string MyBuffKey{};
+			std::vector<UnitId> MyCurrent{};
+			double MyScale{1};
+			double MyOffset{};
+		};
+
+		std::size_t InstallOperatorAura(UnitId _unit, const OperatorAuraDefinition& _definition);
+		void RefreshOperatorAura(std::size_t _handle);
+		void OperatorEnemyTimeSp(ContentEvent& _event, double _perSecond);
+		// 回调可安装新光环；deque 保持当前光环及缓存 key 的引用有效。
+		std::deque<OperatorAuraRuntime> _MyOperatorAuras{};
+
+		struct GroundAttackSpeedRuntime
+		{
+			UnitId MySource{};
+			std::string_view MyKey{};
+			double MyAmount{};
+			unsigned MyCount{1};
+			bool MyApplied{};
+		};
+
+		void InstallGroundAttackSpeed(UnitId _source, std::string_view _key, double _amount, unsigned _count);
+		void RefreshGroundAttackSpeed(std::size_t _handle);
+		std::deque<GroundAttackSpeedRuntime> _MyGroundAttackSpeeds{};
+
 		void PodegoStartZone(UnitId _unit, const PodegoKit& _kit);
 		void PodegoZonePulse(UnitId _unit, WorldPoint _point, double _damage);
 		void TinmanStartZone(UnitId _unit, const TinmanKit& _kit);
@@ -222,6 +299,385 @@ namespace Stronghold
 		void IndigoTick(UnitId _unit, const IndigoKit& _kit, double _delta);
 		void UtageTick(UnitId _unit);
 		void UtageProtect(UnitId _unit, const UtageKit& _kit);
+		void WildmnDeploy(UnitId _unit);
+		void LiskamDamaged(UnitId _unit, const LiskamKit& _kit);
+		void SlchanTick(UnitId _unit);
+		void SlchanSkill(UnitId _unit, const SlchanKit& _kit);
+		void GrabdsSkill(UnitId _unit, const GrabdsKit& _kit);
+		void HaroldBeforeAttack(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void HaroldElementHit(ContentEvent& _event);
+		void OperatorHealHit(UnitId _source, UnitId _target);
+		[[nodiscard]] UnitId PapyrsTarget(UnitId _source) const;
+		void PapyrsSkill(UnitId _unit, const PapyrsKit& _kit, ContentEventKind _event);
+		void NotifyOperatorHealing(ContentEvent& _event, bool _last = false);
+		void BubbleTick(UnitId _unit);
+		void BubbleDamaged(ContentEvent& _event, const BubbleKit& _kit);
+		void HumusPeakBuff(UnitId _unit, const HumusKit& _kit);
+		void RockrTick(UnitId _unit);
+		void RockrSkill(UnitId _unit, const RockrKit& _kit, const ContentEvent& _event);
+		void KazemaTick(UnitId _unit);
+		void KazemaSkill(UnitId _unit, const KazemaKit& _kit, ContentEventKind _event);
+		void OrigamiBurst(UnitId _source, double _scale, bool _tokenBurst = false);
+		void GravelSkill(UnitId _unit, const GravelKit& _kit, const ContentEvent& _event);
+		void TippiHit(ContentEvent& _event);
+		void AkkordTick(UnitId _unit);
+		void AkkordSonic(UnitId _unit, const AkkordKit& _kit);
+		void WhitewBlock(ContentEvent& _event);
+		void BranchSkill(UnitId _unit, const BranchKit& _kit, const ContentEvent& _event);
+		void AshlokDeploy(UnitId _unit, const AshlokKit& _kit);
+		void ScaleAttackByBlock(ContentEvent& _event, double _scale, bool _blocked);
+		void AngelBless(UnitId _unit);
+		void AyerAttack(UnitId _unit, const AyerKit& _kit);
+		void OperatorAddition(UnitId _source, UnitId _target, double _scale, DamageTags _tags, bool _enemyOnly = true);
+		void InstallSkadi(UnitId _unit, const SkadiKit& _kit);
+		void NotifyOperatorLate(ContentEvent& _event);
+		void PhilaeElementTalent(ContentEvent& _event);
+		void PhilaeObserve(ContentEvent& _event);
+		void PhilaeSkill(UnitId _unit, const PhilaeKit& _kit, const ContentEvent& _event);
+		void ForcerSkill(UnitId _unit, const ForcerKit& _kit);
+		void MintSkill(UnitId _unit, const MintKit& _kit, const ContentEvent& _event);
+		void HainiSkill(UnitId _unit, const HainiKit& _kit, const ContentEvent& _event);
+		void HainiKill(UnitId _victim);
+		void PinecnSkill(UnitId _unit, const PinecnKit& _kit, ContentEvent& _event);
+		void SnhuntSkill(UnitId _unit, const SnhuntKit& _kit);
+		void SnhuntTick(UnitId _unit);
+		std::vector<UnitId> _MyHainis{};
+		std::vector<UnitId> _MySnhunts{};
+
+		void BlemshSkill(UnitId _unit, const BlemshKit& _kit, ContentEvent& _event);
+		void BlemshAttackSp(UnitId _unit);
+		void BlemshHeal(UnitId _unit, const BlemshKit& _kit, bool _othersOnly);
+		[[nodiscard]] UnitId InjuredAllyInGrid(UnitId _unit, std::span<const RangeOffset> _range, bool _othersOnly) const;
+		double PerTargetFunnel(CombatUnit& _unit, UnitId _target);
+		std::vector<UnitId> _MyBlemshs{};
+
+		void UpdateBlockingDefense(UnitId _unit, std::string_view _key, double _defense);
+		void ShotstBurst(UnitId _unit, const ShotstKit& _kit);
+		void ShotstShred(UnitId _unit, UnitId _target, const ShotstKit& _kit);
+		void CurseDollTick(UnitId _unit, double _delta);
+		std::vector<UnitId> _MyBlockingDefenders{};
+		std::vector<UnitId> _MyCurseDolls{};
+
+		void VulpisSkill(UnitId _unit, const VulpisKit& _kit, ContentEvent& _event);
+		void VulpisTick(UnitId _unit);
+		void VulpisPunish(UnitId _unit, UnitId _target, const VulpisKit& _kit);
+		void KjeraDeploy(UnitId _unit, const KjeraKit& _kit);
+		void KjeraBeforeAttack(CombatUnit& _unit, const KjeraKit& _kit, std::vector<UnitId>& _targets);
+		[[nodiscard]] double LockedFunnelMultiplier(CombatUnit& _unit, UnitId _target);
+		void MostmaSkill(UnitId _unit, const MostmaKit& _kit, const ContentEvent& _event);
+		void RmixerSkill(UnitId _unit, const RmixerKit& _kit, const ContentEvent& _event);
+		void PrecisionSkill(UnitId _unit, const PrecisionKit& _kit, ContentEvent& _event);
+		void PrecisionBeforeAttack(CombatUnit& _unit, const PrecisionKit& _kit, std::vector<UnitId>& _targets);
+		void PrecisionDeploySp(UnitId _unit);
+		void BeewaxSkill(UnitId _unit, const BeewaxKit& _kit, const ContentEvent& _event);
+		void InesEarly(const ContentEvent& _event);
+		void InesObserve(const ContentEvent& _event);
+		void InesSkill(UnitId _unit, const InesKit& _kit, const ContentEvent& _event);
+		void InesHit(UnitId _unit, UnitId _target, const InesKit& _kit);
+		void InesSentry(UnitId _unit);
+		void InesRecall(UnitId _unit, const InesKit& _kit);
+		void InesClearSpeed(UnitId _unit);
+		void InesRefreshAttack(UnitId _unit, const InesKit& _kit);
+		void RosesaObserve(ContentEvent& _event);
+		void MizukiAttack(UnitId _unit, const MizukiKit& _kit, const ContentEvent& _event);
+		void MizukiPresence(UnitId _unit);
+		void AromaHit(ContentEvent& _event, const AromaKit& _kit);
+		void AromaObserve(const ContentEvent& _event);
+		void AromaLanding(UnitId _unit);
+		void OperatorEachHit(UnitId _source, UnitId _target, const AttackProfile& _profile, bool _main = true);
+		void InstallTokenKit(CombatUnit& _unit);
+		void CatShieldConnect(UnitId _unit);
+		void CatShieldGive(UnitId _unit, UnitId _target, double _ratio);
+		void CatShieldTick(UnitId _unit);
+		void GladySkill(UnitId _unit, const GladyKit& _kit, ContentEvent& _event);
+		void GladyPull(UnitId _unit, UnitId _target, const GladyKit& _kit);
+		void GladyDragDamage(UnitId _unit, UnitId _target, const GladyKit& _kit, double _moved);
+		void GladyTide(ContentEvent& _event);
+		void SetOperatorAttribute(UnitId _unit, std::string_view _key, bool _on, Attribute _attribute, double _value);
+		void SetOperatorModifiers(UnitId _unit, std::string_view _key, bool _on, std::span<const AttributeChange> _modifiers);
+		void ApplyResistanceCut(UnitId _unit, UnitId _target, std::string_view _key, double _duration, double _value);
+		[[nodiscard]] bool LonelyOperator(UnitId _unit, bool _diagonal) const;
+		void OperatorModuleTick(UnitId _unit);
+		void Texas2Start(UnitId _unit, const Texas2Kit& _kit, SkillReason _reason);
+		void Texas2FinishStart(UnitId _unit);
+		void Texas2Cast(UnitId _unit, const Texas2Kit& _kit);
+		void Texas2Rain(UnitId _unit);
+		void Texas2Skill(UnitId _unit, const Texas2Kit& _kit, const ContentEvent& _event);
+		void Texas2Death(const ContentEvent& _event);
+		void GuardDamage(ContentEvent& _event);
+		void MudrokLayers(UnitId _unit, int _layers);
+		void MudrokSkill(UnitId _unit, const MudrokKit& _kit, const ContentEvent& _event);
+		void FlamtlSkill(UnitId _unit, const FlamtlKit& _kit, const ContentEvent& _event);
+		void FlamtlBeforeAttack(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void FlamtlDodge(ContentEvent& _event);
+		void FartthSkill(UnitId _unit, const FartthKit& _kit, ContentEvent& _event);
+		void FartthBeforeAttack(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void SetExtraRange(UnitId _unit, std::span<const int> _keys);
+		void TrackDeferredDamage(CombatUnit& _unit, std::uint64_t _sequence);
+		bool ConsumeDeferredDamage(CombatUnit& _unit, std::uint64_t _sequence);
+		void GvialObserve(ContentEvent& _event, bool _late = false);
+		void GvialSkill(UnitId _unit, const GvialKit& _kit, ContentEvent& _event);
+		void BillroSkill(UnitId _unit, const BillroKit& _kit, ContentEvent& _event);
+		void BldskSkill(UnitId _unit, const BldskKit& _kit, ContentEvent& _event);
+		void BldskBeforeAttack(CombatUnit& _unit, const BldskKit& _kit, std::span<const UnitId> _targets);
+		void BldskDeath(const ContentEvent& _event);
+		void BldskEarly(ContentEvent& _event);
+		void BldskPlasma(UnitId _unit, UnitId _target, const BldskKit& _kit);
+		void OperatorAlliesInRange(UnitId _unit, std::vector<UnitId>& _targets) const;
+		void LowHealthHealBonus(ContentEvent& _event, double _threshold, double _scale, bool _inclusive, bool _self = false, bool _skipRegen = false);
+		void CetsyrSkill(UnitId _unit, const CetsyrKit& _kit, ContentEvent& _event);
+		void LisaSkill(UnitId _unit, const LisaKit& _kit, ContentEvent& _event);
+		void LisaAura(UnitId _unit);
+		void PasngrSkill(UnitId _unit, const PasngrKit& _kit, ContentEvent& _event);
+		void PasngrStorm(UnitId _unit, WorldPoint _point);
+		void PepeSkill(UnitId _unit, const PepeKit& _kit, ContentEvent& _event);
+		void PepeBeforeAttack(CombatUnit& _unit, const PepeKit& _kit, std::vector<UnitId>& _targets);
+		void PepeCleanse(UnitId _unit);
+		[[nodiscard]] bool HasAbnormal(UnitId _unit) const;
+		unsigned CleanseAbnormal(UnitId _unit);
+		void RosmonSkill(UnitId _unit, const RosmonKit& _kit, ContentEvent& _event);
+		void RosmonTargets(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void RosmonStable(UnitId _unit);
+		std::optional<WorldPoint> TacticalSummonTile(UnitId _unit) const;
+		void RosmonGearTick(UnitId _unit);
+		std::vector<UnitId> _MyRosmonGears{};
+		void CelloPick(UnitId _unit);
+		void CelloSkill(UnitId _unit, const CelloKit& _kit, ContentEvent& _event);
+		void CelloElement(ContentEvent& _event);
+		void CelloHit(ContentEvent& _event);
+		void CelloPulse(UnitId _unit, unsigned _kind);
+		void Reed2Scorch(UnitId _unit, UnitId _target);
+		void Reed2Burst(UnitId _unit, WorldPoint _point);
+		void Reed2Module(UnitId _unit);
+		void Reed2Skill(UnitId _unit, const Reed2Kit& _kit, ContentEvent& _event);
+		void Reed2Kill(ContentEvent& _event);
+		std::vector<UnitId> _MyCellos{};
+		std::vector<UnitId> _MyReed2s{};
+		void Halo2BeforeAttack(CombatUnit& _unit, const Halo2Kit& _kit, std::vector<UnitId>& _targets);
+		void Halo2Hit(UnitId _unit, UnitId _target, const Halo2Kit& _kit);
+		void Halo2Observe(ContentEvent& _event);
+		void Halo2Pulse(UnitId _unit);
+		void Agoat2BeforeAttack(CombatUnit& _unit, const Agoat2Kit& _kit, std::vector<UnitId>& _targets);
+		void Agoat2Skill(UnitId _unit, const Agoat2Kit& _kit, ContentEvent& _event);
+		void Agoat2Observe(ContentEvent& _event);
+		void Agoat2Ash(ContentEvent& _event);
+		void Agoat2Pulse(UnitId _unit, bool _ash);
+		void Agoat2Veil(ContentEvent& _event);
+		static void AbsorbElement(ContentEvent& _event, double& _pool, bool _multiplier = false);
+		std::vector<UnitId> _MyHalo2s{};
+
+		struct ElementVeil
+		{
+			std::bitset<FieldTiles> MyKeys{};
+			double MyPool{};
+			double MyUntil{};
+			UnitId MySource{};
+		};
+
+		std::vector<ElementVeil> _MyElementVeils{};
+		void FreeSummonTiles(UnitId _unit, std::span<const RangeOffset> _grid, std::vector<std::uint64_t>& _tiles, bool _ground = true) const;
+		std::optional<WorldPoint> BestSummonTile(std::span<const std::uint64_t> _tiles) const;
+		UnitId LastDeployedOperator(std::size_t _owner) const;
+		void Nearl2Dawn(UnitId _unit, const Nearl2Kit& _kit);
+		void Nearl2Skill(UnitId _unit, const Nearl2Kit& _kit, ContentEvent& _event);
+		void Nearl2Fatal(ContentEvent& _event);
+		void Siege2Skill(UnitId _unit, const Siege2Kit& _kit, ContentEvent& _event);
+		void Siege2Burst(UnitId _unit, const Siege2Kit& _kit);
+		void Siege2Pulse(UnitId _unit);
+		void Siege2Range(UnitId _unit);
+		void Siege2Observe(ContentEvent& _event);
+		std::vector<UnitId> _MySiege2s{};
+		std::vector<UnitId> _MyLastDeployedOperators{};
+		std::vector<UnitId> _MySkillBoundTokens{};
+		bool Sbell2AddSnow(UnitId _unit, int _key);
+		bool Sbell2FreezeTile(UnitId _unit, int _key);
+		void Sbell2Lay(UnitId _unit);
+		void Sbell2Tick(UnitId _unit, double _delta);
+		void Sbell2Skill(UnitId _unit, const Sbell2Kit& _kit, ContentEvent& _event);
+		void Sbell2Observe(ContentEvent& _event, bool _fatal = false);
+		void Sbell2Module(UnitId _unit);
+		std::vector<UnitId> _MySbell2s{};
+		void BlkkgtSlash(UnitId _unit, const BlkkgtKit& _kit, double _scale);
+		void BlkkgtPull(UnitId _unit, const BlkkgtKit& _kit, bool _final);
+		void BlkkgtSkill(UnitId _unit, const BlkkgtKit& _kit, ContentEvent& _event);
+		void BlkkgtTick(UnitId _unit);
+		void BlkkgtStatus(ContentEvent& _event);
+		std::vector<UnitId> _MyBlkkgts{};
+		bool TeleportEnemy(UnitId _enemy, WorldPoint _point);
+		bool YuCrosses(const CombatUnit& _unit, UnitId _source, UnitId _target) const;
+		void YuSkill(UnitId _unit, const YuKit& _kit, ContentEvent& _event);
+		void YuPulse(UnitId _unit, unsigned _kind);
+		void YuObserve(ContentEvent& _event);
+		std::vector<UnitId> _MyYus{};
+		static bool AbnormalStatus(CombatStatus _status);
+		void HealingTargets(UnitId _unit, std::vector<UnitId>& _targets, bool _abnormal) const;
+		void LumenBeforeAttack(CombatUnit& _unit, const LumenKit& _kit, std::vector<UnitId>& _targets);
+		void LumenHealHit(UnitId _unit, UnitId _target, const LumenKit& _kit);
+		void LumenSkill(UnitId _unit, const LumenKit& _kit, ContentEvent& _event);
+		void LumenObserve(ContentEvent& _event);
+		void LumenHealing(ContentEvent& _event);
+		void LumenTick(UnitId _unit);
+		std::vector<UnitId> _MyLumens{};
+		void QiubaiSkill(UnitId _unit, const QiubaiKit& _kit, ContentEvent& _event);
+		void QiubaiHit(UnitId _unit, UnitId _target, const QiubaiKit& _kit);
+		void QiubaiBurst(UnitId _unit, UnitId _target);
+		std::vector<UnitId> _MyPepes{};
+
+		void LemuenSkill(UnitId _unit, const LemuenKit& _kit, ContentEvent& _event);
+		void LemuenObserve(ContentEvent& _event);
+		void LemuenWanted();
+		void LemuenRange(UnitId _unit);
+		void UpdateBombardmentLock(BombardmentLock& _lock);
+		void LemuenFire(std::size_t _handle, unsigned _shot);
+		void LemuenBlast(UnitId _unit, WorldPoint _point, double _attack);
+
+		struct LemuenBombardment
+		{
+			UnitId MySource{};
+			std::uint64_t MyDeployment{};
+			double MyAttack{};
+			std::vector<BombardmentLock> MyLocks{};
+		};
+
+		std::deque<LemuenBombardment> _MyLemuenBombardments{};
+		std::vector<UnitId> _MyLemuens{};
+
+		void Thorn2Start(UnitId _unit, const Thorn2Kit& _kit);
+		void Thorn2Zones(UnitId _unit);
+		void Thorn2Vision(UnitId _unit);
+		unsigned StraightRoad(int _row, int _column);
+		std::optional<std::array<unsigned, FieldTiles>> _MyStraightRoads{};
+
+		void MlynarSkill(UnitId _unit, const MlynarKit& _kit, ContentEvent& _event);
+		void MlynarObserve(ContentEvent& _event, bool _early = false);
+		void MlynarTrait(UnitId _unit, const MlynarKit& _kit);
+		void AglinaSkill(UnitId _unit, const AglinaKit& _kit, ContentEvent& _event);
+		void SntllaSkill(UnitId _unit, const SntllaKit& _kit, ContentEvent& _event);
+		void SntllaTalent(UnitId _unit);
+		void SntllaImpact(UnitId _unit, WorldPoint _point);
+		void NymphSkill(UnitId _unit, const NymphKit& _kit, ContentEvent& _event);
+		void NymphObserve(ContentEvent& _event);
+		void NymphSoul(UnitId _unit, UnitId _target, double _scale);
+		void Svash2Skill(UnitId _unit, const Svash2Kit& _kit, ContentEvent& _event);
+		void Svash2Observe(ContentEvent& _event);
+		void Svash2Snow(UnitId _unit);
+		void Svash2Slash(UnitId _unit, const Svash2Kit& _kit);
+		void SkillEnemiesIgnoringStealth(UnitId _unit, std::span<const RangeOffset> _range, std::vector<UnitId>& _targets);
+		void TargetsOnLine(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void Ghost2Skill(UnitId _unit, const Ghost2Kit& _kit, ContentEvent& _event);
+		void Ghost2Pulse(UnitId _unit, bool _damage);
+		void Ghost2Team(UnitId _unit);
+		void Ghost2EachHit(UnitId _source, UnitId _target);
+		void DuskSkill(UnitId _unit, const DuskKit& _kit, ContentEvent& _event);
+		void DuskKill(ContentEvent& _event);
+		void DuskSummon(UnitId _unit, const DuskKit& _kit, UnitId _target);
+		void PreferUnblocked(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void DemkniSkill(UnitId _unit, const DemkniKit& _kit, ContentEvent& _event);
+		void DemkniSuit(UnitId _unit);
+		void DemkniAuto(UnitId _unit);
+		void DemkniTargets(UnitId _unit, const DemkniKit& _kit, std::vector<UnitId>& _targets) const;
+		void HornSkill(UnitId _unit, const HornKit& _kit, ContentEvent& _event);
+		void HornFatal(ContentEvent& _event);
+		void HornFlares(UnitId _unit);
+		void OperatorAttackProfile(CombatUnit& _unit, AttackProfile& _profile);
+		void PeriodicHealthLoss(UnitId _unit, double& _accumulator, double _delta, double _interval, double _ratio, bool _silent);
+		void SurtrSkill(UnitId _unit, const SurtrKit& _kit, ContentEvent& _event);
+		void SurtrFatal(ContentEvent& _event);
+		void EtlchiSkill(UnitId _unit, const EtlchiKit& _kit, ContentEvent& _event);
+		void EtlchiObserve(ContentEvent& _event, bool _late = false);
+		void EtlchiCandles(UnitId _unit, const EtlchiKit& _kit);
+		void RedirectCandles(UnitId _unit, std::vector<UnitId>& _targets);
+		void CrowdAttackSpeed(UnitId _unit, std::string_view _key, double _speed, double _count);
+		void UlpiaSkill(UnitId _unit, const UlpiaKit& _kit, ContentEvent& _event);
+		void UlpiaContact(UnitId _unit, const UlpiaKit& _kit);
+		void UlpiaAnchor(UnitId _unit, const UlpiaKit& _kit);
+		void UlpiaHurt(ContentEvent& _event);
+		bool IsAbyssal(UnitId _unit) const;
+		bool OnOwnBoard(std::size_t _player, int _row, int _column) const;
+		void Blaze2Skill(UnitId _unit, const Blaze2Kit& _kit, ContentEvent& _event);
+		void Blaze2Observe(ContentEvent& _event);
+		void Blaze2Fatal(ContentEvent& _event);
+		void Blaze2Ground(UnitId _unit);
+		void ArtsAndElement(UnitId _unit, UnitId _target, double _scale, double _elementScale, Element _element);
+		void BurstSpAura(UnitId _unit, std::string_view _key, double _sp);
+		void TitiSkill(UnitId _unit, const TitiKit& _kit, ContentEvent& _event);
+		void TitiObserve(ContentEvent& _event);
+		void TitiPulse(UnitId _unit, bool _dream);
+		void TitiSleepOthers(UnitId _unit, UnitId _from, const TitiKit& _kit);
+		void TitiWard(UnitId _unit, UnitId _target, bool _fatal);
+		void FoesInRadius(WorldPoint _origin, double _radius, std::vector<UnitId>& _targets, bool _center = false) const;
+		void Excu2Skill(UnitId _unit, const Excu2Kit& _kit, ContentEvent& _event);
+		void Excu2Dodge(ContentEvent& _event);
+		void Excu2ExtraAttack(UnitId _unit, std::uint64_t _deployment);
+		void CetsyrMotes(UnitId _unit);
+		void CetsyrInspire(UnitId _unit, const CetsyrKit& _kit);
+		bool IsOperatorLeader(UnitId _unit) const;
+		void CetsyrProtect(ContentEvent& _event);
+		void Inspire(UnitId _source, UnitId _target, double _value, bool _health = false);
+		void GnosisSkill(UnitId _unit, const GnosisKit& _kit, const ContentEvent& _event);
+		void GnosisBeforeAttack(CombatUnit& _unit, std::vector<UnitId>& _targets);
+		void GnosisAura(UnitId _unit, bool _resist);
+		void LionhdSkill(UnitId _unit, const LionhdKit& _kit);
+		void LionhdPresence(UnitId _unit);
+		void ReckprObserve(const ContentEvent& _event);
+		void BeewaxSummon(UnitId _unit, const BeewaxKit& _kit);
+		void TokenBurst(UnitId _unit, UnitId _credit, double _scale, double _stun, std::span<const RangeOffset> _range, DamageType _type = DamageType::ARTS, unsigned _hits = 1);
+		void RmixerObserve(ContentEvent& _event);
+		void RmixerShield(UnitId _unit);
+		void ReloadNation(UnitId _unit, std::string_view _nation, double _ammo, std::optional<double> _radius = {});
+		[[nodiscard]] bool HoldsUndying(UnitId _unit) const;
+		void ArchetTactics(UnitId _unit);
+		void ArchetScatter(UnitId _unit, UnitId _target, WorldPoint _point, const ArchetKit& _kit);
+		void ArchetPursuit(UnitId _unit, const ArchetKit& _kit);
+		[[nodiscard]] UnitId NearestProjectileTarget(UnitId _source, WorldPoint _point, double _radius, std::span<const UnitId> _skip) const;
+		std::vector<UnitId> _MyVulpises{};
+		std::vector<UnitId> _MyArchets{};
+
+		void VigilDeploy(UnitId _unit, const VigilKit& _kit);
+		void VigilSkill(UnitId _unit, const VigilKit& _kit, const ContentEvent& _event);
+		void VigilTick(UnitId _unit);
+		void VigilMark(UnitId _unit);
+		void WolfBlocked(UnitId _wolf, UnitId _enemy);
+		void WolfDeploy(UnitId _unit);
+		void SetWolfShadows(UnitId _unit, unsigned _count);
+		bool AddWolfShadow(UnitId _unit, unsigned _maximum);
+		bool ReturnWolf(UnitId _unit);
+		void WolfFatal(ContentEvent& _event, bool _late);
+		void WolfDeath(const ContentEvent& _event, bool _late);
+		void NotifyWolfCombat(ContentEvent& _event);
+		void WolfBeforeAttack(CombatUnit& _unit);
+		[[nodiscard]] bool WolfOnField(UnitId _unit) const;
+		std::vector<UnitId> _MyVigils{};
+		std::vector<UnitId> _MyLockedFunnelUsers{};
+		std::vector<UnitId> _MyInitialSpCarriers{};
+		std::vector<UnitId> _MyIneses{};
+		std::vector<UnitId> _MyRosesas{};
+		std::vector<UnitId> _MyAromas{};
+		std::vector<UnitId> _MyGladys{};
+		std::vector<UnitId> _MyReckprs{};
+		std::vector<UnitId> _MyBldsks{};
+		std::vector<UnitId> _MyCetsyrs{};
+		std::vector<UnitId> _MyTitis{};
+		std::vector<UnitId> _MyBlazes{};
+		std::vector<UnitId> _MyEtlchis{};
+		std::vector<UnitId> _MyDemknis{};
+		std::vector<UnitId> _MyGhost2s{};
+		std::vector<UnitId> _MySvash2s{};
+		std::vector<UnitId> _MyNymphs{};
+		std::vector<UnitId> _MyMlynars{};
+		std::vector<UnitId> _MyWolves{};
+
+		void Swire2Pay(UnitId _unit, const Swire2Kit& _kit);
+		void Swire2Fatal(ContentEvent& _event);
+		void Swire2Skill(UnitId _unit, const Swire2Kit& _kit, const ContentEvent& _event);
+		void Swire2Heal(UnitId _unit, const Swire2Kit& _kit);
+		void Swire2Tick(UnitId _unit);
+		void Swire2Cash(UnitId _unit, const Swire2Kit& _kit);
+		std::size_t Swire2BombTiles(UnitId _unit, std::array<WorldPoint, 9>& _tiles) const;
+		bool Swire2ThrowDue(UnitId _unit, const Swire2Kit& _kit);
+		void ChampagneTick(UnitId _unit);
+		std::vector<UnitId> _MySwire2s{};
+		std::vector<UnitId> _MyChampagnes{};
 
 		struct InsiderAmmoGrant
 		{
@@ -232,7 +688,8 @@ namespace Stronghold
 		};
 
 		std::vector<InsiderAmmoGrant> _MyInsiderGrants{};
-		bool _MyOperatorBeforeAttack{};
+		std::vector<UnitId> _MyPendingOperatorReleases{};
+		std::size_t _MyOperatorBeforeAttackHandlers{};
 		bool _MyTinmanWither{};
 
 		struct VendlaRuntime
@@ -248,6 +705,29 @@ namespace Stronghold
 		std::vector<UnitId> _MyEstells{};
 		std::vector<UnitId> _MyPodegos{};
 		std::vector<UnitId> _MyUtages{};
+		std::vector<UnitId> _MyWildmns{};
+		std::vector<UnitId> _MySilents{};
+		std::vector<UnitId> _MySlchans{};
+		std::vector<UnitId> _MyHarolds{};
+		std::vector<UnitId> _MyBubbles{};
+		std::vector<UnitId> _MyRockrs{};
+		std::vector<UnitId> _MyKazemas{};
+		std::vector<UnitId> _MyAkkords{};
+
+		struct SkillSummonRuntime
+		{
+			UnitId MyOwner{};
+			std::string MyToken{};
+			unsigned MyStock{};
+			std::vector<UnitId> MyPieces{};
+		};
+
+		void DockSkillSummons();
+		bool DeployDockedSummon(UnitId _unit);
+		void NotifyTokenKits(ContentEvent& _event, bool _late = false);
+		void TokenDeploy(UnitId _unit);
+		[[nodiscard]] const CombatDefinition* FindTokenTemplate(UnitId _owner, std::string_view _token) const;
+		std::vector<SkillSummonRuntime> _MySkillSummons{};
 
 		void GenericHit(UnitId _source, UnitId _target, double _dealt);
 		void GenericElement(UnitId _source, UnitId _target, double _dealt);
@@ -471,7 +951,7 @@ namespace Stronghold
 		std::vector<AddonBondRuntime> _MyAddonBonds{};
 		bool _MyBondHitEffects{};
 
-		enum class ScheduledKind { CRATE_BREAK, TOKEN_EXPIRE, COLD_WIND, PROFESSION, AFTERSHOCK, EQUIPMENT, EQUIPMENT_RETREAT, HAMMER, EQUIPMENT_EXPIRE, BOND_REFRESH, BOND_AURA, BOND_RAID, CORE_BOND_REFRESH, CORE_BOND_PULSE, GARRISON_REFRESH, INSIDER_AMMO, OPERATOR_REVEAL, PODEGO_AURA, PODEGO_ZONE, TINMAN_ZONE };
+		enum class ScheduledKind { CRATE_BREAK, TOKEN_EXPIRE, COLD_WIND, PROFESSION, AFTERSHOCK, EQUIPMENT, EQUIPMENT_RETREAT, HAMMER, EQUIPMENT_EXPIRE, BOND_REFRESH, BOND_AURA, BOND_RAID, CORE_BOND_REFRESH, CORE_BOND_PULSE, GARRISON_REFRESH, INSIDER_AMMO, OPERATOR_REVEAL, OPERATOR_AURA, PODEGO_ZONE, TINMAN_ZONE, DOCKED_SUMMON_RETRY, TOKEN_KIT_EXPIRE, OPERATOR_GROUND_ASPD, ANGEL_BLESS, ARCHET_TACTICS, WOLF_GROW, WOLF_RETURN, VIGIL_MARK, RMIXER_SHIELD, INES_SENTRY, INES_FIRST_RETREAT, MIZUKI_PRESENCE, AROMA_LANDING, CATHY_FORGE, CAT_SHIELD, GNOSIS_AURA, GNOSIS_RESIST, LIONHD_PRESENCE, OPERATOR_MODULE, TEXAS2_RAIN, MUDROK_LAYERS, CETSYR_MOTES, EXCU2_ATTACK, TITI_DREAM, TITI_VIGOR, BLAZE_GROUND, SURTR_RETREAT, HORN_FLARES, LISA_AURA, DEMKNI_SUIT, DUSK_EXPIRE, GHOST2_SLOW, GHOST2_DAMAGE, SVASH2_SNOW, SNTLLA_TALENT, SNTLLA_IMPACT, THORN2_ZONES, THORN2_VISION, LEMUEN_WANTED, LEMUEN_EXTRADITION, LEMUEN_FIRE, LEMUEN_BLAST, PASNGR_STORM, QIUBAI_BURST, YU_PULSE, SBELL2_MODULE, SIEGE2_PULSE, HALO2_PULSE, AGOAT2_PULSE, CELLO_PULSE, REED2_BURST, REED2_MODULE, ROSMON_STABLE };
 
 		// 所有内置延迟动作共用稳定的时间／序号排序，不捕获 this，移动 Battle 安全。
 		struct ScheduledAction
@@ -510,6 +990,22 @@ namespace Stronghold
 			double MyCooldown{};
 		};
 
+		struct DirectProjectileHit
+		{
+			DamageType MyType{DamageType::PHYSICAL};
+			double MyScale{1};
+			std::optional<double> MyStillScale{};
+			unsigned MyHits{1};
+			DamageTags MyTags{static_cast<DamageTags>(DamageTag::SKILL)};
+			double MyBounceRadius{};
+			bool MyProfileScale{};
+		};
+
+		void LaunchSkillProjectile(UnitId _source, UnitId _target, double _speed, const DirectProjectileHit& _hit, std::optional<WorldPoint> _from = {}, std::size_t _chain = NoPlayer);
+
+		std::deque<std::vector<UnitId>> _MyProjectileChains{};
+		std::vector<std::size_t> _MyFreeProjectileChains{};
+
 		struct Projectile
 		{
 			UnitId MySource{};
@@ -524,6 +1020,8 @@ namespace Stronghold
 			bool MyReturning{};
 			std::uint64_t MyAttackId{};
 			bool MySkillAttack{};
+			std::optional<DirectProjectileHit> MyDirectHit{};
+			std::size_t MyChain{NoPlayer};
 			bool MyInitialPositionAttack{}; // 发射时捕获，瞬发技能结束后命中仍使用同一位置模式。
 		};
 
@@ -717,6 +1215,7 @@ namespace Stronghold
 		std::vector<ScheduledAction> _MyScheduled;
 		std::vector<ScheduledAction> _MyDueActions;
 		std::uint64_t _MyScheduleSequence{};
+		std::uint64_t _MyDamageSequence{};
 		std::uint64_t _MyAttackSequence{};
 		std::vector<Projectile> _MyProjectiles;
 		std::vector<Projectile> _MyArrivedProjectiles;

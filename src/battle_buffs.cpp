@@ -11,10 +11,10 @@ namespace Stronghold
 			_definition.MyMaxStacks == 0 || _definition.MyMaxStacks > 1000000 ||
 			static_cast<unsigned>(_definition.MyRefresh) > static_cast<unsigned>(BuffRefresh::KEEP) ||
 			!std::isfinite(_definition.MyInterval) || _definition.MyInterval < 0 ||
-			!std::isfinite(_definition.MyShield.MyHealth) || _definition.MyShield.MyHealth < 0 ||
+			!std::isfinite(_definition.MyShieldBreakSp) || std::isless(_definition.MyShieldBreakSp, 0) || !std::isfinite(_definition.MyShield.MyHealth) || _definition.MyShield.MyHealth < 0 ||
 			_definition.MyShield.MyHits < 0 || _definition.MyShield.MyTypeMask > 15)
 			throw std::invalid_argument("invalid buff definition");
-		if (static_cast<unsigned>(_definition.MyBuiltin) > static_cast<unsigned>(BuiltinBuff::SIRACUSA_STEALTH)) throw std::invalid_argument("invalid builtin buff");
+		if (static_cast<unsigned>(_definition.MyBuiltin) > static_cast<unsigned>(BuiltinBuff::RMIXER_SHIELD)) throw std::invalid_argument("invalid builtin buff");
 		if (_definition.MyStatus && *_definition.MyStatus >= CombatStatus::COUNT) throw std::invalid_argument("invalid buff status");
 		if (_definition.MyStealthRestore && (!std::isfinite(*_definition.MyStealthRestore) || std::isless(*_definition.MyStealthRestore, 0))) throw std::invalid_argument("invalid stealth restore time");
 		if (_definition.MyElementBurst && *_definition.MyElementBurst >= Element::COUNT) throw std::invalid_argument("invalid burst element");
@@ -133,8 +133,11 @@ namespace Stronghold
 		if (removed.MyDefinition.MyElementBurst) unit.MyElements.MyGauges.fill(0);
 		Recalculate(unit);
 		if (removed.MyDefinition.MyBuiltin == BuiltinBuff::SARGON_STACK) SyncSargon(unit.MyId);
+		if (removed.MyDefinition.MyBuiltin == BuiltinBuff::RMIXER_SHIELD) unit.MyRmixerShieldLostAt = Time();
 		if (removed.MyDefinition.MyBuiltin == BuiltinBuff::SIRACUSA_STEALTH) unit.MySiracusaStealthEnd = Time();
 		EndProfessionBuff(unit, removed.MyDefinition.MyBuiltin, false);
+		if (removed.MyDefinition.MyShield.MyHits <= 0 && unit.MyAlive && std::isgreater(removed.MyDefinition.MyShieldBreakSp, 0))
+			(void)GainSp(unit.MyId, removed.MyDefinition.MyShieldBreakSp);
 		RunBuffEffects(removed.MyDefinition.MySource, _target, removed.MyDefinition.MyRemoveEffects, 1);
 		ContentEvent event{.MyKind = ContentEventKind::BUFF_REMOVED, .MyUnit = _target, .MyBuff = _buff};
 		NotifyContent(event);
@@ -193,6 +196,13 @@ namespace Stronghold
 			_unit.MyBaseTriggerMask = RangeMask(origin, _unit.MyFacing, _unit.MyDefinition.MyRange, _unit.MyStats.MyPermanentRangeExtend);
 		}
 		else _unit.MyBaseTriggerMask = _unit.MyBaseRangeMask;
+		for (const auto key : _unit.MyExtraRangeKeys)
+		{
+			if (key < 0 || key >= FieldTiles) continue;
+			const auto index = static_cast<std::size_t>(key);
+			if (!_unit.MyRangeMask.test(index)) { _unit.MyRangeMask.set(index); _unit.MyRangeKeys.push_back(key); }
+			if (UsesInitialPosition(_unit) && !_unit.MyInitialRuleRangeMask.test(index)) { _unit.MyInitialRuleRangeMask.set(index); _unit.MyInitialRuleRangeKeys.push_back(key); }
+		}
 		const auto triggerExtend = definition.MyTrigger == SkillTrigger::ACTIVE_RANGE && !definition.MyNoRangeExtend ? _unit.MyStats.MyPermanentRangeExtend : 0;
 		_unit.MySkill.MyTriggerMask = RangeMask(origin, _unit.MyFacing, definition.MyTriggerRange, triggerExtend);
 	}
@@ -262,13 +272,14 @@ namespace Stronghold
 		for (const auto& effect : _effects)
 		{
 			if (!Unit(_target).MyAlive || Finished()) break;
-			const auto amount = effect.MyAmount * (effect.MyPerSecond ? _delta : 1);
+			const auto amount = effect.MyAmount * (effect.MyPerSecond ? _delta : 1) * (effect.MySourceAttackScale && _source ? Unit(_source).MyStats.MyAttack : 1) *
+				(effect.MyTargetMaxHealthScale ? Unit(_target).MyStats.MyMaxHealth : 1);
 			switch (effect.MyKind)
 			{
 			case BuffEffectKind::DAMAGE: (void)DealDamage(_source, _target, DamageInfo{.MyAmount = amount, .MyType = effect.MyDamageType,
-				.MyCanDodge = effect.MyCanDodge, .MySourceless = effect.MySourceless, .MyNoSp = effect.MyNoSp, .MyTags = effect.MyTags}); break;
+				.MyCanDodge = effect.MyCanDodge, .MySourceless = effect.MySourceless, .MyNoSp = effect.MyNoSp, .MyTags = effect.MyTags, .MyIsSkill = effect.MyIsSkill}); break;
 			case BuffEffectKind::HEAL: (void)Heal(_source, _target, amount); break;
-			case BuffEffectKind::HEALTH_LOSS: (void)LoseHealth(_source, _target, amount); break;
+			case BuffEffectKind::HEALTH_LOSS: (void)LoseHealth(effect.MySourceless ? 0 : _source, _target, amount); break;
 			}
 		}
 	}
@@ -338,6 +349,7 @@ namespace Stronghold
 					(void)ApplyStrongest(unit.MyId, expired.MyDefinition.MyKey, strength->MyTail->MyUntil - Time(), resumed, source);
 				}
 				if (expired.MyDefinition.MyBuiltin == BuiltinBuff::SARGON_STACK) SyncSargon(unit.MyId);
+				if (expired.MyDefinition.MyBuiltin == BuiltinBuff::RMIXER_SHIELD) unit.MyRmixerShieldLostAt = Time();
 				if (expired.MyDefinition.MyBuiltin == BuiltinBuff::SIRACUSA_STEALTH) unit.MySiracusaStealthEnd = Time();
 				EndProfessionBuff(unit, expired.MyDefinition.MyBuiltin, true);
 				RunBuffEffects(source, unit.MyId, expired.MyDefinition.MyExpireEffects, 1);
@@ -396,6 +408,7 @@ namespace Stronghold
 			amount = std::max(0.0, previous - target.MyHealth);
 		}
 		target.MyTotals.MyTaken += amount;
+		target.MyLastHitAt = Time();
 		if (_source && Unit(_source).MySide != target.MySide)
 		{
 			auto& source = _MyUnits[Index(_source)];

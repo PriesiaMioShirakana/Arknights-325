@@ -31,7 +31,8 @@ namespace Stronghold
 
 		void ValidateAttack(const AttackProfile& _attack)
 		{
-			if (static_cast<unsigned>(_attack.MyScaling) > static_cast<unsigned>(AttackScaling::REINFORCEMENT) || !Bounded(_attack.MyConditionalScale) ||
+			if (static_cast<unsigned>(_attack.MyScaling) > static_cast<unsigned>(AttackScaling::REINFORCEMENT) || !Bounded(_attack.MyConditionalScale) || !Bounded(_attack.MyCriticalScale) || !Bounded(_attack.MyOperatorBonusScale) ||
+				(_attack.MyCriticalProbability && !Bounded(*_attack.MyCriticalProbability, 0, 1)) ||
 				!Bounded(_attack.MyHealFarMultiplier) || !Bounded(_attack.MyHealNearDistance) || !_attack.MyHits || !_attack.MyMaxTargets || !Bounded(_attack.MyAttackScale) || !
 				Bounded(_attack.MyDamageMultiplier) || (_attack.MyHitMultiplier && !Bounded(*_attack.MyHitMultiplier))
 				|| !Bounded(_attack.MyHealScale) || !Bounded(_attack.MySplashRadius) || !Bounded(_attack.MySplashScale)
@@ -56,6 +57,33 @@ namespace Stronghold
 	{
 		if (static_cast<unsigned>(_definition.MyOperatorProfession) > static_cast<unsigned>(OperatorProfession::SPECIAL))
 			throw std::invalid_argument("invalid operator profession");
+		if (_definition.MyTokenKit && (_enemy || _definition.MyTokenKit->MyKind > TokenKitKind::ROSMON_GEAR || !Bounded(_definition.MyTokenKit->MyLifetime, 0, 3600) ||
+			!Bounded(_definition.MyTokenKit->MyBurstScale) || !Bounded(_definition.MyTokenKit->MyBurstStun) || !Bounded(_definition.MyTokenKit->MySluggish) ||
+			!Bounded(_definition.MyTokenKit->MyBlockedDefense, -1e9) ||
+			std::isnan(_definition.MyTokenKit->MyMatureTime) || std::isless(_definition.MyTokenKit->MyMatureTime, 0)))
+			throw std::invalid_argument("invalid token kit");
+		if (_definition.MyDeviceShieldRate && !Bounded(*_definition.MyDeviceShieldRate)) throw std::invalid_argument("invalid device shield rate");
+		if (_definition.MyTokenKit && _definition.MyTokenKit->MyKind == TokenKitKind::CAT_SHIELD)
+		{
+			if (!_definition.MyTokenKit->MyCatShield) throw std::invalid_argument("shield device requires its rules");
+			const auto& rule = *_definition.MyTokenKit->MyCatShield;
+			if (!Bounded(rule.MyIdle) || !Bounded(rule.MyInterval, 0.000001) || !Bounded(rule.MyMaxRatio) || !Bounded(rule.MyRefill)) throw std::invalid_argument("invalid shield device rules");
+		}
+		if (_definition.MyOriginalDeploymentCost && !Bounded(*_definition.MyOriginalDeploymentCost)) throw std::invalid_argument("invalid original deployment cost");
+		if (_definition.MyTokenKit)
+		{
+			AttributeModifiers modifiers; modifiers.Add(_definition.MyTokenKit->MyAuraModifiers);
+			for (const auto cell : _definition.MyTokenKit->MyBurstRange)
+				if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) throw std::invalid_argument("invalid token burst range");
+		}
+		if (_definition.MyTokenKit && _definition.MyTokenKit->MyKind == TokenKitKind::WOLF_PACK)
+		{
+			if (!_definition.MyTokenKit->MyWolf) throw std::invalid_argument("wolf pack requires its rules");
+			const auto& wolf = *_definition.MyTokenKit->MyWolf;
+			if (!Bounded(wolf.MyInterval) || !Bounded(wolf.MyBlockPerShadow) || !wolf.MyMaxShadows || wolf.MyMaxShadows > 1000000 ||
+				!Bounded(wolf.MyDefenseIgnore) || !Bounded(wolf.MyBlockedReduction) || !Bounded(wolf.MyAdditionScale) || !Bounded(wolf.MyTaunt, -1e9))
+				throw std::invalid_argument("invalid wolf pack rules");
+		}
 		if (_definition.MyOperatorKit)
 		{
 			if (_enemy) throw std::invalid_argument("operator kit on enemy");
@@ -63,7 +91,7 @@ namespace Stronghold
 			{
 				using T = std::decay_t<decltype(kit)>;
 				if constexpr (std::is_same_v<T, InsiderKit>) return Bounded(kit.MyDelay) && Bounded(kit.MySelfAmmo) && Bounded(kit.MyAllyAmmo);
-				else if constexpr (std::is_same_v<T, YakKit>) return Bounded(kit.MyResistance, -1e9);
+				else if constexpr (std::is_same_v<T, BasicOperatorKit>) return true;
 				else if constexpr (std::is_same_v<T, LeiziKit>) return Bounded(kit.MyUnblockedScale);
 				else if constexpr (std::is_same_v<T, UdflowKit>) return Bounded(kit.MyDuration) && Bounded(kit.MyInterval) && Bounded(kit.MyDamage) && Bounded(kit.MySeaDamage);
 				else if constexpr (std::is_same_v<T, VignaKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MySkillProbability, 0, 1) && Bounded(kit.MyAttack, -1e9) &&
@@ -79,7 +107,6 @@ namespace Stronghold
 				else if constexpr (std::is_same_v<T, CaperKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyCriticalScale) && Bounded(kit.MyNearScale);
 				else if constexpr (std::is_same_v<T, SunbrKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyCriticalScale) && Bounded(kit.MyStun) &&
 					Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyHealingScale) && Bounded(kit.MyCookingSeconds) && Bounded(kit.MyCookingDefense, -1e9) && Bounded(kit.MyServingAttack, -1e9);
-				else if constexpr (std::is_same_v<T, SkgoatKit> || std::is_same_v<T, GreyyKit>) return true;
 				else if constexpr (std::is_same_v<T, EstellKit>)
 				{
 					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
@@ -94,6 +121,208 @@ namespace Stronghold
 					Bounded(kit.MySkillProbabilityScale) && Bounded(kit.MyDamageScale) && Bounded(kit.MyInterval, 0, 3600);
 				else if constexpr (std::is_same_v<T, UtageKit>) return Bounded(kit.MyMaxAttackSpeed) && Bounded(kit.MyMinHealthRatio, 0, 1) &&
 					Bounded(kit.MyProtectThreshold, 0, 1) && Bounded(kit.MyProtection, 0, 1) && Bounded(kit.MyHealthLoss, 0, 1);
+				else if constexpr (std::is_same_v<T, WildmnKit>) return Bounded(kit.MyCostCut) && Bounded(kit.MyCostCap) && Bounded(kit.MyForce, -1e9);
+				else if constexpr (std::is_same_v<T, LiskamKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return Bounded(kit.MySp) && Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyStun) && Bounded(kit.MySelfStun);
+				}
+				else if constexpr (std::is_same_v<T, ExcuKit>) return true;
+				else if constexpr (std::is_same_v<T, SilentKit>) return Bounded(kit.MyAuraAttackSpeed, -1e9) && Bounded(kit.MyGroundHealScale) &&
+					kit.MyStockCap > 0 && (!kit.MyDrone || !kit.MyToken.empty());
+				else if constexpr (std::is_same_v<T, SlchanKit> || std::is_same_v<T, GrabdsKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					if constexpr (std::is_same_v<T, SlchanKit>) return kit.MyTargets > 0 && Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyDefense, -1e9) &&
+						Bounded(kit.MyForce, -1e9) && Bounded(kit.MyDragDamage) && Bounded(kit.MyDragDistance, 0.01) && Bounded(kit.MyScale) && Bounded(kit.MyStun);
+					else return kit.MyTargets > 0 && Bounded(kit.MySluggish) && Bounded(kit.MyBeastSluggish) &&
+						Bounded(kit.MySpPerSecond) && Bounded(kit.MySleep);
+				}
+				else if constexpr (std::is_same_v<T, HaroldKit>) return Bounded(kit.MyResistance, 0, 1) && Bounded(kit.MyRecoveryScale);
+				else if constexpr (std::is_same_v<T, PapyrsKit>) return Bounded(kit.MyShieldScale) && Bounded(kit.MyShieldDuration) && Bounded(kit.MySkillShieldScale);
+				else if constexpr (std::is_same_v<T, GhostKit>) return Bounded(kit.MyBlockedScale) && Bounded(kit.MyStun);
+				else if constexpr (std::is_same_v<T, BubbleKit>) return Bounded(kit.MyAttackDebuff, -1e9) && Bounded(kit.MyDebuffDuration) &&
+					Bounded(kit.MyBlockingDefense, -1e9) && Bounded(kit.MyCounterScale);
+				else if constexpr (std::is_same_v<T, HumusKit>)
+				{
+					double previous = 1;
+					for (const auto peak : kit.MyPeaks)
+					{
+						if (!Bounded(peak.MyHealthRatio, 0, previous) || !Bounded(peak.MyAttack, -1e9)) return false;
+						previous = peak.MyHealthRatio;
+					}
+					return Bounded(kit.MyOverhealCap) && Bounded(kit.MyHeal);
+				}
+				else if constexpr (std::is_same_v<T, RockrKit>) return Bounded(kit.MyStackAttack, -1e9) && Bounded(kit.MyStackInterval) &&
+					kit.MyMaxStacks <= 1000000 && Bounded(kit.MyOverloadAttack, -1e9) && Bounded(kit.MyOverloadScale);
+				else if constexpr (std::is_same_v<T, KazemaKit>) return !kit.MyToken.empty() && Bounded(kit.MyBurstScale) && Bounded(kit.MyHealthLoss, 0, 1) && Bounded(kit.MyDollAttack, -1e9);
+				else if constexpr (std::is_same_v<T, GravelKit>) return Bounded(kit.MyCost, -1e9) && Bounded(kit.MyAuraDefense, -1e9) &&
+					(!kit.MyAuraCostLimit || Bounded(*kit.MyAuraCostLimit)) && Bounded(kit.MyShieldRatio) && Bounded(kit.MyDefense) && Bounded(kit.MyDuration, 0, 3600);
+				else if constexpr (std::is_same_v<T, TippiKit>) return Bounded(kit.MyStackTime) && Bounded(kit.MyProbability, 0, 1);
+				else if constexpr (std::is_same_v<T, FlowerKit>) return Bounded(kit.MyRegenRatio);
+				else if constexpr (std::is_same_v<T, AkkordKit>) return Bounded(kit.MyAllyAttack, -1e9) && Bounded(kit.MySonicScale) &&
+					Bounded(kit.MyRadius) && Bounded(kit.MyMinDistance, -1e9) && Bounded(kit.MyMaxDistance, -1e9) && Bounded(kit.MyDistanceScale);
+				else if constexpr (std::is_same_v<T, WhitewKit>) return Bounded(kit.MySilence) && Bounded(kit.MyAdditionScale) && Bounded(kit.MyBlockProbability, 0, 1);
+				else if constexpr (std::is_same_v<T, BranchKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return Bounded(kit.MyHealRatio) && Bounded(kit.MyBlockedReduction) && Bounded(kit.MyTremble) && Bounded(kit.MyResistance, 0, 0.95);
+				}
+				else if constexpr (std::is_same_v<T, AshlokKit>) return Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyGroundAttack, -1e9) && Bounded(kit.MyGroundCount) && Bounded(kit.MyBlockedScale);
+				else if constexpr (std::is_same_v<T, AngelKit>) return Bounded(kit.MyBlessAttack, -1e9) && Bounded(kit.MyBlessHealth, -1e9) && Bounded(kit.MyGroundAttackSpeed, -1e9) && kit.MyGroundCount > 0;
+				else if constexpr (std::is_same_v<T, AyerKit> || std::is_same_v<T, SwireKit>)
+				{
+					for (const auto cell : kit.MyTalentRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					if constexpr (std::is_same_v<T, AyerKit>) return Bounded(kit.MyAuraAttackSpeed, -1e9) && Bounded(kit.MyBladeScale) && Bounded(kit.MyAdditionScale);
+					else
+					{
+						for (const auto cell : kit.MySkillRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+						return Bounded(kit.MyAuraAttack, -1e9) && Bounded(kit.MySkillScale);
+					}
+				}
+				else if constexpr (std::is_same_v<T, SkadiKit>) return Bounded(kit.MyTeamAttack, -1e9) && Bounded(kit.MyRedeploy, -1e9) && Bounded(kit.MyBlockedScale) &&
+					Bounded(kit.MyReviveHealthMultiplier, 0.05) && Bounded(kit.MyReviveAttackSpeed, -1e9) && Bounded(kit.MyReviveHealthRatio);
+				else if constexpr (std::is_same_v<T, Swire2Kit>) return kit.MySkill <= Swire2SkillKind::CASH && !kit.MyToken.empty() &&
+					Bounded(kit.MyCoinCap, 0, 1000000) && Bounded(kit.MyCoinCost, 0.000001) && Bounded(kit.MyStartCoins) && Bounded(kit.MyPaymentCoins) &&
+					Bounded(kit.MyPaymentAttack, -1e9) && kit.MyPaymentStacks > 0 && Bounded(kit.MyModuleAttack, -1e9) && kit.MyModuleStacks > 0 &&
+					Bounded(kit.MyReviveCost) && Bounded(kit.MyReviveCostScale) && Bounded(kit.MyReviveHealth) && Bounded(kit.MyHealScale) &&
+					Bounded(kit.MyHealRatio, 0, 1) && Bounded(kit.MyDamageScale) && Bounded(kit.MySluggish) && Bounded(kit.MyForce, -1e9);
+				else if constexpr (std::is_same_v<T, PhilaeKit>) return Bounded(kit.MyElementResistance, 0, 1) && Bounded(kit.MyApoptosisSp) && Bounded(kit.MyElementScale) &&
+					Bounded(kit.MyBarrier) && Bounded(kit.MyRageAttack, -1e9) && Bounded(kit.MyCounterScale) && Bounded(kit.MyCounterElement) && Bounded(kit.MyCounterCooldown);
+				else if constexpr (std::is_same_v<T, ForcerKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return Bounded(kit.MyHeavyMass, -1e9) && Bounded(kit.MyDefenseIgnore) && Bounded(kit.MyRefundRatio) && Bounded(kit.MyForce, -1e9) &&
+						Bounded(kit.MyDirectStun) && Bounded(kit.MyWallStun) && Bounded(kit.MyBrushStun);
+				}
+				else if constexpr (std::is_same_v<T, MintKit>)
+				{
+					for (const auto cell : kit.MyTalentRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return Bounded(kit.MyAuraDefense, -1e9) && Bounded(kit.MyTaunt, -1e9) && Bounded(kit.MyKeepDefense, -1e9) && Bounded(kit.MyKeepResistance, -1e9) &&
+						Bounded(kit.MyForce, -1e9) && Bounded(kit.MyEndScale);
+				}
+				else if constexpr (std::is_same_v<T, HainiKit>) return Bounded(kit.MyFragile) && Bounded(kit.MyMoveMultiplier) && Bounded(kit.MyKillStep) && Bounded(kit.MyMaxMultiplier);
+				else if constexpr (std::is_same_v<T, PinecnKit>)
+				{
+					for (const auto value : kit.MyAttackSteps) if (!Bounded(value, -1e9)) return false;
+					return Bounded(kit.MySpDuration) && Bounded(kit.MySpRecovery, -1e9) && Bounded(kit.MyDefenseIgnore);
+				}
+				else if constexpr (std::is_same_v<T, SnhuntKit>) return Bounded(kit.MyMovingScale) && Bounded(kit.MyStillScale) && kit.MyShots > 0 && kit.MyShots <= 1000000 &&
+					Bounded(kit.MyBeastScale) && Bounded(kit.MyCold) && Bounded(kit.MyReloadExtra);
+				else if constexpr (std::is_same_v<T, BlemshKit>)
+				{
+					for (const auto cell : kit.MyHealRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return kit.MySkill <= BlemshSkillKind::INCARNATE && Bounded(kit.MyAttackSp) && Bounded(kit.MySleepScale) && Bounded(kit.MyAdditionScale) &&
+						Bounded(kit.MyHealScale) && Bounded(kit.MyRegenRatio) && Bounded(kit.MyLowHealthThreshold, 0, 1) && Bounded(kit.MyLowHealthHealScale);
+				}
+				else if constexpr (std::is_same_v<T, MalistKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyCriticalScale);
+				else if constexpr (std::is_same_v<T, WeakeningKit>)
+				{
+					AttributeModifiers modifiers; modifiers.Add(kit.MySkillModifiers);
+					return Bounded(kit.MyHealthRatio, 0, 1) && Bounded(kit.MyFragile) && kit.MyTargets > 0 && (!kit.MySummon || !kit.MyToken.empty());
+				}
+				else if constexpr (std::is_same_v<T, BlockingDefenseKit>) return Bounded(kit.MyDefense, -1e9);
+				else if constexpr (std::is_same_v<T, ShotstKit>) return Bounded(kit.MyFlyingScale) && Bounded(kit.MySkillScale) && Bounded(kit.MyShred, -1e9) && Bounded(kit.MyShredDuration) && kit.MyTargets > 0;
+				else if constexpr (std::is_same_v<T, VulpisKit>)
+				{
+					for (const auto cell : kit.MyRange) if (cell.MyRow < -100 || cell.MyRow > 100 || cell.MyColumn < -100 || cell.MyColumn > 100) return false;
+					return kit.MySkill <= VulpisSkillKind::CAMOUFLAGE && Bounded(kit.MyDp) && Bounded(kit.MyDamageScale) && Bounded(kit.MySluggish) && Bounded(kit.MyStun) &&
+						kit.MyTargets > 0 && Bounded(kit.MyAttackSpeed, -1e9) && Bounded(kit.MyMarkDuration) && Bounded(kit.MyMarkScale) && Bounded(kit.MyDpBonus, -1e9) &&
+						Bounded(kit.MyQuietTime) && Bounded(kit.MyRegenRatio) && Bounded(kit.MyBlockingAttack, -1e9) && Bounded(kit.MyBlockingDefense, -1e9);
+				}
+				else if constexpr (std::is_same_v<T, KjeraKit>) return Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyGroundAttack, -1e9) && Bounded(kit.MyGroundTiles) &&
+					kit.MyDrones > 0 && kit.MyDrones <= 1000000 && Bounded(kit.MyColdProbability, 0, 1) && Bounded(kit.MyCold);
+				else if constexpr (std::is_same_v<T, ArchetKit>) return kit.MySkill <= ArchetSkillKind::STORM && Bounded(kit.MyTacticsInterval, 0.000001) && Bounded(kit.MyTacticsSp) &&
+					Bounded(kit.MyShieldSp) && Bounded(kit.MyGroundAttackSpeed, -1e9) && kit.MyHits > 0 && kit.MyHits <= 1000000 && kit.MyScatterTargets <= 1000000 && Bounded(kit.MyScale);
+				else if constexpr (std::is_same_v<T, VigilKit>) return kit.MySkill <= VigilSkillKind::DIGNITY && !kit.MyToken.empty() && kit.MyInitialWolves > 0 &&
+					kit.MyMaxWolves > 0 && kit.MyMaxWolves <= 1000000 && Bounded(kit.MyDefenseIgnore) && Bounded(kit.MyAdditionScale) && Bounded(kit.MyDp) &&
+					Bounded(kit.MyDpInterval) && Bounded(kit.MyDpCap) && Bounded(kit.MyGiftHeal) && Bounded(kit.MyGiftScale) && Bounded(kit.MyGiftDp);
+				else if constexpr (std::is_same_v<T, MostmaKit>) return kit.MySkill <= MostmaSkillKind::RIPPLE && Bounded(kit.MySpRecovery) && Bounded(kit.MyMoveSpeed, -1e9) &&
+					Bounded(kit.MySkillSlowScale) && Bounded(kit.MyDamageScale) && Bounded(kit.MyForce, -1e9);
+				else if constexpr (std::is_same_v<T, RmixerKit>) return kit.MySkill <= RmixerSkillKind::COUNTER && Bounded(kit.MyReload) && Bounded(kit.MyGuardCost, 1) &&
+					kit.MyCounterTargets > 0 && Bounded(kit.MyCounterRatio) && Bounded(kit.MyDefense, -1e9) && Bounded(kit.MyAttackSpeed, -1e9) && Bounded(kit.MyStackDuration) &&
+					kit.MyStacks > 0 && Bounded(kit.MyShieldInterval) && Bounded(kit.MyShieldRatio);
+				else if constexpr (std::is_same_v<T, PrecisionKit>) return Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyScale) && Bounded(kit.MyStun) && Bounded(kit.MyUpgradeAfter) &&
+					kit.MyInitialHits > 0 && kit.MyUpgradedHits > 0 && Bounded(kit.MyLowHealthRatio, 0, 1) && Bounded(kit.MyLowHealthScale) && Bounded(kit.MyInitialSp);
+				else if constexpr (std::is_same_v<T, BeewaxKit>) return !kit.MyToken.empty() && Bounded(kit.MyKeepDefense, -1e9) && Bounded(kit.MyKeepResistance, -1e9) &&
+					Bounded(kit.MyRegenRatio) && Bounded(kit.MyBurstScale) && Bounded(kit.MyStun) && Bounded(kit.MyLifetime);
+				else if constexpr (std::is_same_v<T, InesKit>) return kit.MySkill <= InesSkillKind::RECALL && Bounded(kit.MyDp) && Bounded(kit.MyBleedScale) && Bounded(kit.MyBleedDuration) &&
+					Bounded(kit.MyStealSpeed) && Bounded(kit.MyMaxSpeed) && Bounded(kit.MyBind) && Bounded(kit.MyStealAttack) && !std::isnan(kit.MyMaxAttack) && !std::isless(kit.MyMaxAttack, 0) &&
+					Bounded(kit.MyMoveMultiplier) && Bounded(kit.MyFirstRedeploy, -1e9) && Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyRecallRadius) && Bounded(kit.MyRecallScale) && kit.MyRecallTargets > 0;
+				else if constexpr (std::is_same_v<T, RosesaKit>) return Bounded(kit.MyHealingScale) && Bounded(kit.MyDamageScale, 0, 1) && Bounded(kit.MyDelayDuration) && Bounded(kit.MyDelayInterval, 0.1);
+				else if constexpr (std::is_same_v<T, MizukiKit>) return kit.MySkill <= MizukiSkillKind::MIRROR && kit.MyTargets > 0 && Bounded(kit.MyTalentScale) && Bounded(kit.MyAwakenScale) &&
+					Bounded(kit.MyStatusDuration) && Bounded(kit.MySelfLoss) && Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyAttack, -1e9) && (!kit.MySlow || Bounded(*kit.MySlow));
+				else if constexpr (std::is_same_v<T, AromaKit>) return Bounded(kit.MyFirstScale) && Bounded(kit.MyLevitate) && Bounded(kit.MyDistanceScale) && Bounded(kit.MyMinDistance) &&
+					Bounded(kit.MyMaxDistance) && Bounded(kit.MyFlyingScale) && Bounded(kit.MyLandingScale);
+				else if constexpr (std::is_same_v<T, LisaKit>) return Bounded(kit.MySpRecovery) && Bounded(kit.MyFragile) && Bounded(kit.MyBoost) && Bounded(kit.MyHealRatio) && Bounded(kit.MyModuleSp);
+				else if constexpr (std::is_same_v<T, DemkniKit>) return kit.MySkill <= DemkniSkillKind::CALCIFY && Bounded(kit.MyGrowthInterval, 1) && kit.MyMaxStacks > 0 &&
+					Bounded(kit.MyHealSp) && Bounded(kit.MyHealScale) && Bounded(kit.MyLowHealthThreshold, 0, 1) && Bounded(kit.MyLowHealScale);
+				else if constexpr (std::is_same_v<T, HornKit>) return kit.MySkill <= HornSkillKind::DEFENSE && Bounded(kit.MyTeamAttack, -1e9) && Bounded(kit.MyReviveHeal) &&
+					Bounded(kit.MyBlockedScale) && Bounded(kit.MyUnblockedSpeed, -1e9) && Bounded(kit.MyFlareRadius) && Bounded(kit.MyFlareDuration) &&
+					Bounded(kit.MyMagicScale) && Bounded(kit.MyOverloadAttack, -1e9) && Bounded(kit.MyMainDuration) && Bounded(kit.MyOverloadDuration, 0.1) && Bounded(kit.MyLossInterval, 0.05) && Bounded(kit.MyPeakLoss);
+				else if constexpr (std::is_same_v<T, SurtrKit>) return kit.MySkill <= SurtrSkillKind::TWILIGHT && Bounded(kit.MyEmberDuration) && Bounded(kit.MyInterval, 0.05) &&
+					Bounded(kit.MyPeakLoss) && Bounded(kit.MyRamp, 0.1) && Bounded(kit.MySoloScale) && Bounded(kit.MyUnblockedSpeed, -1e9) && Bounded(kit.MyArtsFragile);
+				else if constexpr (std::is_same_v<T, EtlchiKit>) return kit.MySkill <= EtlchiSkillKind::CANDLE && !kit.MyCandleId.empty() && Bounded(kit.MyCandleHealth) && Bounded(kit.MyCandleDefense) &&
+					Bounded(kit.MyCandleResistance) && kit.MyCandles > 0 && Bounded(kit.MySteal) && Bounded(kit.MyStealCap) && Bounded(kit.MyDot) && Bounded(kit.MyDotDuration) &&
+					Bounded(kit.MyDotInterval, 0.000001) && Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyHealRatio) && Bounded(kit.MyReduction, 0, 1) &&
+					Bounded(kit.MyCrowdSpeed, -1e9) && Bounded(kit.MyCrowdCount) && Bounded(kit.MySickleScale) && Bounded(kit.MySickleInterval, 0.1);
+				else if constexpr (std::is_same_v<T, UlpiaKit>) return kit.MySkill <= UlpiaSkillKind::PATH && !kit.MyToken.empty() && kit.MyReach > 0 && kit.MyReach <= 1000000 &&
+					Bounded(kit.MyRadius) && Bounded(kit.MyScale) && Bounded(kit.MyStun) && Bounded(kit.MyForce, -1e9) && kit.MyTargets > 0 && Bounded(kit.MyHealthThreshold, 0, 1) &&
+					Bounded(kit.MyHeal) && Bounded(kit.MyLowHeal) && Bounded(kit.MyTalentScale) && kit.MyMaxStacks > 0 && kit.MySharedMaxStacks > 0;
+				else if constexpr (std::is_same_v<T, Blaze2Kit>) return kit.MySkill <= Blaze2SkillKind::FURNACE && Bounded(kit.MyMeltdownScale) && Bounded(kit.MyMeltdownHeal) &&
+					Bounded(kit.MyDownShield) && Bounded(kit.MyDownRegen) && Bounded(kit.MyReviveStun) && Bounded(kit.MyBurstMultiplier) && Bounded(kit.MyBurstSp) &&
+					Bounded(kit.MyLoss) && Bounded(kit.MyAttackLoss) && Bounded(kit.MyBurnBonus) && Bounded(kit.MyAmmoRefill) && Bounded(kit.MyRadius) &&
+					Bounded(kit.MyAidDuration) && Bounded(kit.MyAidInterval, 0.1) && Bounded(kit.MyArtsScale) && Bounded(kit.MyElementScale) && Bounded(kit.MyMoveMultiplier);
+				else if constexpr (std::is_same_v<T, TitiKit>) return kit.MySkill <= TitiSkillKind::BLOOM && Bounded(kit.MyStillScale) && Bounded(kit.MyDreamScale) && Bounded(kit.MyTalentScale) &&
+					Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyAuraSpeed, -1e9) && Bounded(kit.MySleep) && Bounded(kit.MySleepChance, 0, 1) &&
+					Bounded(kit.MyMinScale) && Bounded(kit.MyMaxScale) && Bounded(kit.MyChainSleep) && Bounded(kit.MyRadius) && kit.MyChainTargets > 0;
+				else if constexpr (std::is_same_v<T, Excu2Kit>) return kit.MySkill <= Excu2SkillKind::VERDICT && Bounded(kit.MyExtraChance, 0, 1) && Bounded(kit.MyChancePerAmmo) &&
+					Bounded(kit.MyFactionAmmo) && Bounded(kit.MyFactionCap) && Bounded(kit.MyDodgeChance, 0, 1) && Bounded(kit.MyRefill) && Bounded(kit.MyAttackPerAmmo, -1e9) &&
+					kit.MyMaxStacks > 0 && Bounded(kit.MyFinalScale) && Bounded(kit.MyHealScale) && (!kit.MyBaseHeal || Bounded(*kit.MyBaseHeal)) && Bounded(kit.MyCrowdSpeed, -1e9) && Bounded(kit.MyCrowdCount);
+				else if constexpr (std::is_same_v<T, CetsyrKit>) return kit.MySkill <= CetsyrSkillKind::REWEAVE && (!kit.MyTraitRatio || Bounded(*kit.MyTraitRatio)) && kit.MyMotes <= 1000000 &&
+					Bounded(kit.MyCooldown) && Bounded(kit.MySkillCooldown) && Bounded(kit.MyAllyRadius) && Bounded(kit.MyMoteDuration) && Bounded(kit.MyTraitScale) &&
+					Bounded(kit.MyEnemyRadius) && Bounded(kit.MyMoteScale) && Bounded(kit.MyBind) && Bounded(kit.MyInspire) && Bounded(kit.MyRedistributeInterval, kit.MyOrbitMotes ? 0.1 : 0.5) &&
+					Bounded(kit.MySarkazReduction, 0, 1) && Bounded(kit.MyModuleAttack, -1e9) && Bounded(kit.MyModuleCount) && Bounded(kit.MyAngularSpeed, -1e9) && Bounded(kit.MyBaseRatio);
+				else if constexpr (std::is_same_v<T, GvialKit>) return kit.MySkill <= GvialSkillKind::DEFER && Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyDefense, -1e9) &&
+					Bounded(kit.MyAttackPerBlock, -1e9) && Bounded(kit.MyDefensePerBlock, -1e9) && Bounded(kit.MyHealthThreshold, 0, 1) && Bounded(kit.MyHealingScale) &&
+					Bounded(kit.MyLowHealthHealingScale) && Bounded(kit.MyBlockedScale) && Bounded(kit.MyReductionThreshold, 0, 1) && Bounded(kit.MyPhysicalReduction, 0, 1) &&
+					Bounded(kit.MyDeferral, 0, 0.99) && Bounded(kit.MyDelayDuration, 0.000001) && Bounded(kit.MyDelayInterval, BattleClock::StepSeconds) && Bounded(kit.MyLifeSteal) && Bounded(kit.MyForce, -1e9);
+				else if constexpr (std::is_same_v<T, BillroKit>) return kit.MySkill <= BillroSkillKind::DEVOUR && Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyKeepDefense, -1e9) &&
+					Bounded(kit.MyKeepResistance, -1e9) && Bounded(kit.MyHeal) && Bounded(kit.MyChargedHeal) && Bounded(kit.MySpRecovery) && Bounded(kit.MyEnemyScale) &&
+					Bounded(kit.MyEnemyCap) && Bounded(kit.MyMarkScale) && Bounded(kit.MyBind) && Bounded(kit.MySluggish);
+				else if constexpr (std::is_same_v<T, BldskKit>) return Bounded(kit.MyBandageHeal) && Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyDuration) && Bounded(kit.MyInterval, 0.1) &&
+					Bounded(kit.MyHealthLoss) && Bounded(kit.MySelfSp) && Bounded(kit.MyAllySp) && Bounded(kit.MyHealthRatio, 0, 1) && Bounded(kit.MyHealScale);
+				else if constexpr (std::is_same_v<T, FlamtlKit>)
+				{
+					AttributeModifiers check; check.Add(kit.MyBlockingModifiers);
+					return kit.MySkill <= FlamtlSkillKind::FLAME && Bounded(kit.MyDp) && kit.MyPulses <= 1000000 && Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MyScale) &&
+						Bounded(kit.MyStun) && kit.MyTargets > 0 && Bounded(kit.MyDodge, 0, 1) && Bounded(kit.MyDodgeDuration) && Bounded(kit.MyNationDodge, 0, 1);
+				}
+				else if constexpr (std::is_same_v<T, FartthKit>) return kit.MySkill <= FartthSkillKind::LINE && Bounded(kit.MyQuietTime) && Bounded(kit.MyAttack, -1e9) &&
+					Bounded(kit.MySurvivorSp) && Bounded(kit.MyFarScale) && Bounded(kit.MyDistanceScale) && Bounded(kit.MyMinDistance) && Bounded(kit.MyMaxDistance);
+				else if constexpr (std::is_same_v<T, SpAuraKit>) return Bounded(kit.MyRecovery);
+				else if constexpr (std::is_same_v<T, SvrashKit>) return Bounded(kit.MyRedeployMultiplier) && Bounded(kit.MyAdditionScale);
+				else if constexpr (std::is_same_v<T, Texas2Kit>) return kit.MySkill <= Texas2SkillKind::RAIN && Bounded(kit.MyBurstScale) && Bounded(kit.MyBurstStun) &&
+					Bounded(kit.MyScale) && Bounded(kit.MyStun) && Bounded(kit.MyInterval, 0.1) && kit.MyTargets > 0 && Bounded(kit.MyResistance, -1e9) &&
+					Bounded(kit.MyDebuffDuration) && Bounded(kit.MySilence) && Bounded(kit.MyDotDuration) && Bounded(kit.MyDotDamage) && Bounded(kit.MyDotInterval, 0.1) &&
+					Bounded(kit.MyHealRatio) && Bounded(kit.MyAttackSpeed, -1e9) && Bounded(kit.MyDamageReduction, 0, 1) && Bounded(kit.MyLonelyAttack, -1e9);
+				else if constexpr (std::is_same_v<T, HsgumaKit>) return Bounded(kit.MyBlockProbability, 0, 1) && Bounded(kit.MyAuraDefense, -1e9) && Bounded(kit.MyBlockingDefense, -1e9) && Bounded(kit.MyCounterScale);
+				else if constexpr (std::is_same_v<T, MudrokKit>)
+				{
+					AttributeModifiers check; check.Add(kit.MyAwakeModifiers); check.Add(kit.MyLonelyModifiers);
+					return kit.MySkill <= MudrokSkillKind::DORMANT && Bounded(kit.MySleep) && Bounded(kit.MyMoveMultiplier) && Bounded(kit.MyStun) && Bounded(kit.MyProbability, 0, 1) &&
+						Bounded(kit.MySkillHeal) && kit.MyMaxLayers >= 0 && kit.MyLayerGain >= 0 && Bounded(kit.MyLayerInterval, 0.000001) && Bounded(kit.MyLayerHeal) &&
+						Bounded(kit.MySarkazReduction, 0, 1) && Bounded(kit.MyBlockedScale);
+				}
+				else if constexpr (std::is_same_v<T, GnosisKit>) return kit.MySkill <= GnosisSkillKind::HYPOTHERMIA && Bounded(kit.MyScale) && Bounded(kit.MyCold) && Bounded(kit.MyAttackCold) &&
+					Bounded(kit.MyColdFragile) && Bounded(kit.MyFreezeFragile) && Bounded(kit.MySpRecovery) && Bounded(kit.MyResistDelay) && Bounded(kit.MyResist, 0, 1);
+				else if constexpr (std::is_same_v<T, LionhdKit>) return Bounded(kit.MyScale) && Bounded(kit.MyResistance, -1e9) && Bounded(kit.MyDuration) && Bounded(kit.MyAttack, -1e9) && Bounded(kit.MyMaxStacks);
+				else if constexpr (std::is_same_v<T, ReckprKit>) return Bounded(kit.MyGuardDuration) && Bounded(kit.MyGuardHeal) && Bounded(kit.MyProbability, 0, 1) && Bounded(kit.MySp) &&
+					Bounded(kit.MyDuration) && Bounded(kit.MyAttackSpeed, -1e9) && kit.MyMaxStacks > 0 && Bounded(kit.MyHealthRatio, 0, 1) && Bounded(kit.MyHealScale);
+				else if constexpr (std::is_same_v<T, CathyKit>) { AttributeModifiers check; check.Add(kit.MyForgeModifiers); return true; }
+				else if constexpr (std::is_same_v<T, GladyKit>) return kit.MySkill <= GladySkillKind::TORNADO && Bounded(kit.MyForce, -1e9) && Bounded(kit.MyFarRadius) && Bounded(kit.MyFarForce) &&
+					Bounded(kit.MyDragDamage) && Bounded(kit.MyDragDistance, 0.000001) && Bounded(kit.MyInterval, 0.1) && Bounded(kit.MyScale) && Bounded(kit.MyMoveMultiplier) &&
+					Bounded(kit.MyRegenRatio) && Bounded(kit.MySeaReduction, 0, 1) && Bounded(kit.MyMassLimit) && Bounded(kit.MyMassScale);
 				else return false;
 			}, *_definition.MyOperatorKit);
 			if (!valid) throw std::invalid_argument("invalid operator kit");
@@ -343,10 +572,22 @@ namespace Stronghold
 				if (unit.MyKind != UnitKind::TOKEN || !unit.MyOwnerUnit)
 					throw std::invalid_argument("token owner must be an operator in the same player input");
 			}
+			std::set<std::pair<std::uint64_t, std::string_view>> tokenTemplates;
+			for (const auto& entry : player.MyTokenTemplates)
+			{
+				const auto ownerUnit = std::ranges::find_if(player.MyUnits, [&](const auto& _unit)
+					{ return _unit.MyPieceUid == entry.MyOwnerPieceUid && _unit.MyKind == UnitKind::OPERATOR; });
+				if (ownerUnit == player.MyUnits.end() || !tokenTemplates.emplace(entry.MyOwnerPieceUid, entry.MyDefinition.MyId).second)
+					throw std::invalid_argument("token template requires a unique owner and token id");
+				ValidateDefinition(entry.MyDefinition, false);
+				ValidateContent(entry.MyDefinition.MyContent, ContentTag::CUSTOM_OPERATOR);
+				for (const auto& buff : entry.MyDefinition.MyInitialBuffs) ValidateBuff(buff);
+			}
 		}
 		if (_MyInput.MySharedBoss)
 			for (const auto& player : _MyPlayers) _MyInput.MySharedBoss->get().PreparePlayer(player.MyPlayerId);
 		_MyAllyCount = _MyUnits.size();
+		DockSkillSummons();
 		// 阵营 ID 表预留初始规模；单位本体分段存放，后续召唤不使已有引用失效。
 		_MyAllyIds.reserve(_MyAllyCount + 16);
 		_MyEnemyIds.reserve(_MyInput.MySpawns.size());
@@ -428,6 +669,21 @@ namespace Stronghold
 		_MyTexasUnits.reserve(_MyAllyIds.size());
 		_MyEstells.reserve(_MyAllyIds.size()); _MyPodegos.reserve(_MyAllyIds.size());
 		_MyUtages.reserve(_MyAllyIds.size());
+		_MyWildmns.reserve(_MyAllyIds.size());
+		_MySilents.reserve(_MyAllyIds.size()); _MySlchans.reserve(_MyAllyIds.size()); _MyHarolds.reserve(_MyAllyIds.size());
+		_MyBubbles.reserve(_MyAllyIds.size()); _MyRockrs.reserve(_MyAllyIds.size());
+		_MyKazemas.reserve(_MyAllyIds.size()); _MyAkkords.reserve(_MyAllyIds.size());
+		_MySwire2s.reserve(_MyAllyIds.size()); _MyChampagnes.reserve(_MyAllyIds.size());
+		_MyHainis.reserve(_MyAllyIds.size()); _MySnhunts.reserve(_MyAllyIds.size()); _MyBlemshs.reserve(_MyAllyIds.size());
+		_MyBlockingDefenders.reserve(_MyAllyIds.size()); _MyCurseDolls.reserve(_MyAllyIds.size());
+		_MyVulpises.reserve(_MyAllyIds.size()); _MyArchets.reserve(_MyAllyIds.size());
+		_MyGladys.reserve(_MyAllyIds.size());
+		_MyAromas.reserve(_MyAllyIds.size());
+		_MyIneses.reserve(_MyAllyIds.size()); _MyRosesas.reserve(_MyAllyIds.size());
+		_MyInitialSpCarriers.reserve(_MyAllyIds.size());
+		_MyLockedFunnelUsers.reserve(_MyAllyIds.size());
+		_MyVigils.reserve(_MyAllyIds.size()); _MyWolves.reserve(_MyAllyIds.size());
+		_MyPendingOperatorReleases.reserve(_MyAllyIds.size());
 		for (const auto id : _MyAllyIds)
 		{
 			InstallProfession(_MyUnits[Index(id)]);
@@ -565,6 +821,7 @@ namespace Stronghold
 		_unit.MyBody.reset();
 		_unit.MyDownAtHome = false;
 		_unit.MyAlive = true;
+		_unit.MyCountdown.reset();
 		_unit.MyHidden = false;
 		_unit.MyPosition = position;
 		if (_MyGrid)
@@ -662,6 +919,7 @@ namespace Stronghold
 		NotifyContent(event);
 		if (_MyContentFault && !Finished())
 			Finish(BattleEndReason::FORCED);
+		ReleaseOperatorHooks();
 		if (Finished())
 			return;
 		_MyClock.Step();

@@ -15,6 +15,8 @@ namespace Stronghold
 		std::optional<double> MyBaseSluggish{};
 		std::optional<TargetPriority> MyBasePriority{};
 		bool MySkillNoHeal{};
+		std::span<const GenericTalentRecord> MyTalents{};
+		std::span<const RangeOffset> MyBaseRange{};
 	};
 }
 #endif

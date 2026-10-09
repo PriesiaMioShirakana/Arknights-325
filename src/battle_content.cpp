@@ -39,6 +39,7 @@ namespace Stronghold
 
 	void Battle::NotifyContent(ContentEvent& _event)
 	{
+		NotifyOperatorEarly(_event);
 		NotifyGenericSkill(_event);
 		if ((_event.MyKind == ContentEventKind::DEPLOY || _event.MyKind == ContentEventKind::DEATH) && _event.MyUnit && Unit(_event.MyUnit).MyKind == UnitKind::OPERATOR)
 			for (auto& field : _MyHammerFields) field.MyAt = -std::numeric_limits<double>::infinity();
@@ -61,6 +62,7 @@ namespace Stronghold
 			NotifyMedics(_event);
 			NotifyEquipment(_event, false);
 			if (!ownSkillEvent && _event.MyKind != ContentEventKind::TICK) NotifyYanyou(_event);
+			NotifyTokenKits(_event);
 		}
 		if (_MyContentInstances.empty())
 		{
@@ -68,9 +70,13 @@ namespace Stronghold
 			{
 				NotifyBands(_event, false); NotifyChoices(_event);
 				if (_event.MyKind == ContentEventKind::TICK) NotifyYanyou(_event);
-				HammerFatal(_event, true); NotifyProfessionLate(_event); HammerFatal(_event, false);
+				NotifyOperatorLate(_event); HammerFatal(_event, true); NotifyProfessionLate(_event); HammerFatal(_event, false);
 				NotifyMedics(_event, true);
+				NotifyOperatorHealing(_event);
+				NotifyTokenKits(_event, true);
 				NotifyGarrisons(_event, true); NotifyEquipmentLate(_event); NotifyCoreBonds(_event, true); NotifyAddonBonds(_event, true);
+				NotifyOperatorHealing(_event, true);
+			CelloHit(_event);
 			}
 			else NotifyMedics(_event, true);
 			return;
@@ -112,9 +118,13 @@ namespace Stronghold
 		{
 			NotifyBands(_event, false); NotifyChoices(_event);
 			if (_event.MyKind == ContentEventKind::TICK) NotifyYanyou(_event);
-			HammerFatal(_event, true); NotifyProfessionLate(_event); HammerFatal(_event, false);
+			NotifyOperatorLate(_event); HammerFatal(_event, true); NotifyProfessionLate(_event); HammerFatal(_event, false);
 			NotifyMedics(_event, true);
+			NotifyOperatorHealing(_event);
+			NotifyTokenKits(_event, true);
 			NotifyGarrisons(_event, true); NotifyEquipmentLate(_event); NotifyCoreBonds(_event, true); NotifyAddonBonds(_event, true);
+			NotifyOperatorHealing(_event, true);
+			CelloHit(_event);
 		}
 		else NotifyMedics(_event, true);
 		--_MyContentDepth;

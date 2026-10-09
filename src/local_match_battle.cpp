@@ -83,16 +83,30 @@ namespace Stronghold
 		const auto view = *_MyEconomy->View(id);
 		BattlePlayerInput input{.MyPlayerId = id, .MyMirrorDeployment = _boss && _right, .MyRightHalf = _right};
 		input.MyUnits.reserve(view.MyBoard.size());
+		input.MyTokenTemplates.reserve(view.MyBoard.size());
 		for (std::size_t i = 0; i < view.MyBoard.size(); ++i)
 		{
 			const auto& piece = view.MyBoard[i]; if (!piece) continue;
 			const AllyRecord* body = nullptr;
+			TokenSource tokenSource = TokenSource::NONE;
 			bool genericTalents = false;
 			if (!piece->IsToken())
 			{
 				const auto record = _player.MyRoster.Resolve(piece->MyId);
 				body = &record.MyLoadout.MyBody;
 				genericTalents = record.MyStandIn || record.MyDiySelected;
+				for (const auto tokenId : body->MyTokens)
+				{
+					const auto& token = ReferenceToken(tokenId);
+					const TokenVariantRecord* variant = nullptr;
+					if (record.MyDiySelected)
+					{
+						const auto pick = std::ranges::find(_player.MyRoster.Diy(), record.MyIdentity.MyBaseId, &SelectedDiy::MySlot);
+						variant = &token.DiyVariant(record.MyIdentity.Diy(pick->MyCharacter, pick->MySkill, pick->MyModule));
+					}
+					else variant = &token.Variant(record.MyTokenOwner, record.MyLoadout.MySkillIndex, record.MyLoadout.MyModuleId);
+					input.MyTokenTemplates.push_back({.MyOwnerPieceUid = piece->MyUid, .MyDefinition = variant->MyBody.MakeKitDefinition()});
+				}
 			}
 			else
 			{
@@ -100,12 +114,19 @@ namespace Stronghold
 				if (owner == view.MyBoard.end()) continue;
 				const auto record = _player.MyRoster.Resolve((*owner)->MyId);
 				const auto& token = ReferenceToken(piece->MyId);
+				const TokenVariantRecord* variant = nullptr;
 				if (record.MyDiySelected)
 				{
 					const auto pick = std::ranges::find(_player.MyRoster.Diy(), record.MyIdentity.MyBaseId, &SelectedDiy::MySlot);
-					body = &token.DiyVariant(record.MyIdentity.Diy(pick->MyCharacter, pick->MySkill, pick->MyModule)).MyBody;
+					variant = &token.DiyVariant(record.MyIdentity.Diy(pick->MyCharacter, pick->MySkill, pick->MyModule));
 				}
-				else body = &token.Variant(record.MyTokenOwner, record.MyLoadout.MySkillIndex, record.MyLoadout.MyModuleId).MyBody;
+				else variant = &token.Variant(record.MyTokenOwner, record.MyLoadout.MySkillIndex, record.MyLoadout.MyModuleId);
+				body = &variant->MyBody;
+				const auto tokenOwner = record.MyTokenOwner;
+				const bool ownVariant = variant->MyOwnerId == tokenOwner || (tokenOwner.ends_with("_b") && variant->MyOwnerId.ends_with("_a") &&
+					variant->MyOwnerId.size() == tokenOwner.size() && variant->MyOwnerId.substr(0, tokenOwner.size() - 2) == tokenOwner.substr(0, tokenOwner.size() - 2));
+				if (ownVariant && token.MyPlaceable && variant->MyHasSources && !variant->MySources.empty() && !std::ranges::contains(variant->MySources, "talent"))
+					tokenSource = std::ranges::contains(variant->MySources, "skill") ? TokenSource::SKILL : TokenSource::UNAVAILABLE;
 			}
 			const auto position = BoardPosition::FromIndex(i);
 			const auto row = _boss ? position.MyRow - 7 : position.MyRow;
@@ -140,7 +161,7 @@ namespace Stronghold
 			}
 			input.MyUnits.emplace_back(AllyDeployment{.MyPieceUid = piece->MyUid, .MyDefinition = std::move(definition),
 				.MyPosition = {static_cast<double>(column), static_cast<double>(row)}, .MyFacing = facing,
-				.MyKind = piece->IsToken() ? UnitKind::TOKEN : UnitKind::OPERATOR, .MyOwnerPieceUid = piece->MyOwnerUid});
+				.MyKind = piece->IsToken() ? UnitKind::TOKEN : UnitKind::OPERATOR, .MyOwnerPieceUid = piece->MyOwnerUid, .MyTokenSource = tokenSource});
 		}
 		const auto bonds = Bonds(_player); input.MyBonds.reserve(bonds.size());
 		for (const auto& bond : bonds) input.MyBonds.emplace_back(BondLayer{std::string(bond.MyId), bond.MyLayers, bond.MyCount, bond.MyActive, bond.MyTier});

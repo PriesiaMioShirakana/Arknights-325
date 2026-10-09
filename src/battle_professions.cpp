@@ -15,7 +15,7 @@ namespace Stronghold
 				? std::max(BattleClock::StepSeconds, definition.MyMerchantInterval) : 1.0;
 			Schedule(ScheduledAction{.MyAt = Time() + interval, .MyKind = ScheduledKind::PROFESSION, .MySource = _unit.MyId, .MyInterval = interval});
 		}
-		if (definition.MyKind == ProfessionTrait::SKYWALKER)
+		if (definition.MyKind == ProfessionTrait::SKYWALKER && (!_unit.MyDefinition.MyOperatorKit || !std::holds_alternative<TippiKit>(*_unit.MyDefinition.MyOperatorKit)))
 		{
 			StatusFlags flags;
 			flags.set(static_cast<std::size_t>(CombatStatus::BLOCK_FLYING));
@@ -79,6 +79,11 @@ namespace Stronghold
 		switch (definition.MyKind)
 		{
 		case ProfessionTrait::TACTICIAN:
+			if (const auto* vigil = unit.MyDefinition.MyOperatorKit ? std::get_if<VigilKit>(unit.MyDefinition.MyOperatorKit) : nullptr)
+			{
+				if (_event.MyKind == ContentEventKind::DEPLOY) VigilDeploy(unit.MyId, *vigil);
+				break;
+			}
 			if (_event.MyKind == ContentEventKind::DEPLOY && unit.MyAlive &&
 				(!unit.MyProfession.MyReinforcement || !Unit(unit.MyProfession.MyReinforcement).MyAlive))
 			{

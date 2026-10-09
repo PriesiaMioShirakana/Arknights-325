@@ -1,5 +1,6 @@
 #ifndef STRONGHOLD_SIMULATION_COMBAT_TYPES_HPP
 #define STRONGHOLD_SIMULATION_COMBAT_TYPES_HPP
+#include <deque>
 #include <stronghold/simulation/bond_effects.hpp>
 #include <stronghold/simulation/garrison_effects.hpp>
 #include <stronghold/simulation/band_effects.hpp>
@@ -190,6 +191,8 @@ namespace Stronghold
 		BURST_LOCK,
 		HIT_COUNT,
 		HIT_COUNT_ARTS,
+		UNDYING,
+		WEIGHTLESS,
 		COUNT
 	};
 
@@ -252,8 +255,8 @@ namespace Stronghold
 	};
 
 	// 静态位标记让内置与自定义效果区分环境/持续伤害，不在伤害热路径比较字符串。
-	enum class DamageTag : std::uint32_t { TERRAIN = 1, DOT = 2, PERIODIC = 4, DEEPSEA = 8, TALENT = 16, AFTERSHOCK = 32, HP_LOSS = 64, ITEM = 128, STEAD_SHARE = 256, STEAD_THORN = 512, BOND = 1024, ADDITION = 2048, SKILL = 4096, BURST = 8192, COUNTER = 16384, REFLECT = 32768, CHAIN = 65536, ZONE = 131072, NECROSIS = 262144, APOPTOSIS = 524288 };
-	using DamageTags = std::uint32_t;
+	enum class DamageTag : std::uint64_t { TERRAIN = 1, DOT = 2, PERIODIC = 4, DEEPSEA = 8, TALENT = 16, AFTERSHOCK = 32, HP_LOSS = 64, ITEM = 128, STEAD_SHARE = 256, STEAD_THORN = 512, BOND = 1024, ADDITION = 2048, SKILL = 4096, BURST = 8192, COUNTER = 16384, REFLECT = 32768, CHAIN = 65536, ZONE = 131072, NECROSIS = 262144, APOPTOSIS = 524288, DRAG = 1048576, SONIC = 2097152, MODULE = 4194304, SUMMON = 8388608, TRAP = 16777216, PINECN_SPIKE = 33554432, SNHUNT = 67108864, CLOUDBEAST = 134217728, ELEMENTAL = 268435456, SLASH = 536870912, FIREWALL = 1073741824, SNOW = 2147483648, LINK = 4294967296ULL, ELEMENT_DAMAGE = 8589934592ULL, FIREBALL = 17179869184ULL, SCORCH = 34359738368ULL };
+	using DamageTags = std::uint64_t;
 	[[nodiscard]] constexpr DamageTags operator|(DamageTag _left, DamageTag _right) noexcept
 	{ return static_cast<DamageTags>(_left) | static_cast<DamageTags>(_right); }
 	[[nodiscard]] constexpr DamageTags operator|(DamageTags _left, DamageTag _right) noexcept
@@ -282,6 +285,9 @@ namespace Stronghold
 		double MySteadCut{};
 		bool MyIsSplash{};
 		bool MyIsSkill{};
+		std::uint64_t MySequence{};
+		bool MyPrecisionCritical{};
+		bool MyMlynarOwn{};
 		bool MySunbrProc{}; // 同一次伤害的攻击前抽签结果；闪避／取消不会进入命中后的眩晕。
 	};
 
@@ -295,6 +301,10 @@ namespace Stronghold
 		bool MyOverheal{};
 		double MyOverhealDuration{std::numeric_limits<double>::infinity()};
 		bool MySilent{};
+		bool MyHot{};
+		bool MyAura{};
+		bool MySkillHeal{};
+		bool MyReflect{};
 	};
 
 	enum class BuffEffectKind
@@ -314,6 +324,9 @@ namespace Stronghold
 		bool MySourceless{};
 		bool MyNoSp{};
 		DamageTags MyTags{};
+		bool MySourceAttackScale{};
+		bool MyIsSkill{};
+		bool MyTargetMaxHealthScale{};
 	};
 
 	// 枚举顺序也是显示优先级：同满度时神经、侵蚀、灼燃、凋亡、旧版 necrosis。
@@ -345,7 +358,7 @@ namespace Stronghold
 	};
 
 	// 内置到期行为静态分派；自定义 Buff 仍只通过 CUSTOM_BUFF 扩展。
-	enum class BuiltinBuff { NONE, DOLL_SWITCH, DOLL_FORM, SARGON_STACK, SIRACUSA_STEALTH };
+	enum class BuiltinBuff { NONE, DOLL_SWITCH, DOLL_FORM, SARGON_STACK, SIRACUSA_STEALTH, RMIXER_SHIELD };
 
 	struct BuffStrengthTail
 	{
@@ -386,6 +399,7 @@ namespace Stronghold
 		bool MyAllowDead{}; // 战斗开始的再部署修正等效果可显式作用于退场单位。
 		std::optional<BuffStrength> MyStrength{};
 		bool MyNotifyTick{}; // 内置内容显式订阅此 Buff 的 interval；普通 Buff 不广播周期事件。
+		double MyShieldBreakSp{};
 		std::optional<CombatStatus> MyStatus{}; // 状态来源 Buff 可由替身切换清除；普通属性增益保留。
 	};
 
@@ -398,7 +412,7 @@ namespace Stronghold
 	};
 
 	// 职业的目标相关攻击倍率只修正主目标；溅射／连锁使用各自定义，不继承这次主目标的倍率。
-	enum class AttackScaling { NONE, FLYING, UNBLOCKED, DISTANT, FRONT, HUNTER, FUNNEL, REINFORCEMENT };
+	enum class AttackScaling { NONE, FLYING, UNBLOCKED, BLOCKED, DISTANT, FRONT, HUNTER, FUNNEL, REINFORCEMENT };
 
 	// 内置职业状态以值组合到单位；不创建回调对象，不经过 CUSTOM 注册表。
 	enum class ProfessionTrait { NONE, HUNTER, FUNNEL, MYSTIC, PHALANX, BEARER, STALKER, MUSHA, REAPER, INCANTATION, CHARGER, GEEK, MERCHANT, LIBRATOR, BARD, LOOPSHOOTER, BOMBARDER, TACTICIAN, SKYWALKER, DOLLKEEPER };
@@ -488,6 +502,8 @@ namespace Stronghold
 		std::optional<CombatStatus> MyOnHitStatus{};
 		StatusApplication MyOnHitApplication{};
 		bool MyGenericHit{}; // 随攻击配置保存到弹道；瞬发技能结束后仍执行该次命中回调。
+		bool MyOperatorEachHit{};
+		bool MyOperatorSkillHit{}; // 专属技能命中回调随攻击保存，落点处不重新检查技能是否仍开启。
 		bool MyOnlyDuringSkill{}; // 解放者／阵法术师等：技力照常恢复，技能外不普攻。
 		bool MyHitAllBlocked{}; // 强攻手等的目标上限取当前阻挡数，至少为一。
 		AttackScaling MyScaling{};
@@ -497,14 +513,21 @@ namespace Stronghold
 		bool MyBoomerang{};
 		bool MyFortress{};
 		bool MySkillDamage{};
+		DamageTags MyTags{};
+		bool MyPerTargetFunnel{};
+		bool MyLockedFunnel{};
+		bool MyProgressiveHits{};
+		std::optional<double> MyCriticalProbability{};
+		double MyCriticalScale{1};
+		double MyOperatorBonusScale{};
 	};
 
 	// 技能状态机是普通值类型；内置逻辑不经过注册表或虚函数。
 	enum class SkillKind { NONE, DURATION, AMMO, INSTANT, CHARGES, PASSIVE, TOGGLE };
 	enum class SpType { TIME, ATTACK, HURT, NONE };
-	enum class SpReason { TIME, ATTACK, HURT, GRANTED, INITIAL };
+	enum class SpReason { TIME, ATTACK, HURT, GRANTED, INITIAL, SKILL, TALENT, TRAIT };
 	enum class SkillTrigger { DEFAULT, SP_FULL, SEARCH, CUSTOM_RANGE, SKILL_RANGE, ACTIVE_RANGE, GLOBAL, TAKE_DAMAGE, NEVER };
-	enum class SkillReason { MANUAL, TRIGGER, DEPLOY, PASSIVE, DURATION, AMMO, INSTANT, WITHDRAWN, STOPPED, DEATH, SUBSTITUTE };
+	enum class SkillReason { MANUAL, TRIGGER, DEPLOY, PASSIVE, DURATION, AMMO, INSTANT, WITHDRAWN, STOPPED, DEATH, SUBSTITUTE, NO_TARGET, TARGET, KILL, RECAST, DOWNED, ABNORMAL };
 
 	struct SkillDefinition
 	{
@@ -628,6 +651,9 @@ namespace Stronghold
 		std::vector<std::string> MyBonds{};
 		std::vector<std::string> MyItems{};
 		std::vector<std::string> MyGarrisons{};
+		std::string MyCharacterId{};
+		std::string MyNationId{};
+		std::string MyGroupId{};
 	};
 
 	// 医疗内容的数值在适配阶段解析；治疗与倒地事件只读取固定参数。
@@ -652,6 +678,56 @@ namespace Stronghold
 	};
 
 	enum class OperatorProfession { NONE, PIONEER, WARRIOR, TANK, SNIPER, CASTER, MEDIC, SUPPORT, SPECIAL };
+	enum class TokenSource { NONE, SKILL, UNAVAILABLE };
+	enum class TokenKitKind { HEAL_DRONE, PAPER_DOLL, CHAMPAGNE, CURSE_DOLL, WOLF_PACK, OBELISK, CAT_SHIELD, DUSK_DRAGON, ICE_TARGET, RADIANT_SWORD, GOLDEN_OATH, ROSMON_GEAR };
+
+	struct WolfPackDefinition
+	{
+		double MyInterval{};
+		double MyBlockPerShadow{1};
+		unsigned MyMaxShadows{1};
+		double MyDefenseIgnore{};
+		double MyBlockedReduction{1};
+		double MyAdditionScale{};
+		double MyTaunt{};
+		bool MyManaged{};
+	};
+
+	struct CatShieldDefinition
+	{
+		double MyIdle{};
+		double MyInterval{1};
+		double MyMaxRatio{};
+		double MyRefill{};
+	};
+
+	struct TokenKitDefinition
+	{
+		TokenKitKind MyKind{};
+		double MyLifetime{};
+		unsigned MyDeployLimit{}; // 零表示没有数量上限。
+		bool MyCountdown{};
+		double MyBurstScale{};
+		double MySluggish{};
+		double MyMatureTime{std::numeric_limits<double>::infinity()};
+		bool MyManagedBomb{};
+		std::span<const AttributeChange> MyAuraModifiers{};
+		std::optional<WolfPackDefinition> MyWolf{};
+		std::span<const RangeOffset> MyBurstRange{};
+		bool MyBurstSuppressed{};
+		double MyBurstStun{};
+		bool MyLifetimeSpecified{};
+		std::optional<CatShieldDefinition> MyCatShield{};
+		double MyBlockedScale{1};
+		bool MyTrueDamage{};
+		double MyBlockedDefense{};
+	};
+
+	struct TokenCountdown
+	{
+		double MyFrom{};
+		double MyUntil{};
+	};
 
 	struct CombatDefinition
 	{
@@ -683,6 +759,9 @@ namespace Stronghold
 		const GenericSkillEffects* MyGenericSkill{};
 		const OperatorKitDefinition* MyOperatorKit{};
 		OperatorProfession MyOperatorProfession{};
+		std::optional<TokenKitDefinition> MyTokenKit{};
+		std::optional<double> MyOriginalDeploymentCost{};
+		std::optional<double> MyDeviceShieldRate{};
 	};
 
 	struct MapCharacterTile
@@ -741,6 +820,7 @@ namespace Stronghold
 		std::optional<CarryState> MyCarry{};
 		bool MyDeferred{}; // 保留格子，等待内容显式调用 Redeploy；不启动自动再部署。
 		std::uint64_t MyOwnerPieceUid{}; // 可选；同一玩家的拥有者；允许召唤物在输入中位于拥有者之前。
+		TokenSource MyTokenSource{}; // 由拥有者当前技能／模组的 sources 解析，只管理棋盘召唤物。
 	};
 
 	// 盟约层数是每局可变值；具体盟约效果读取它，不共享跨战斗静态状态。
@@ -760,6 +840,12 @@ namespace Stronghold
 		std::string_view MyReason{}; // 仅本次调用/同步内容回调借用。
 	};
 
+	struct TokenTemplate
+	{
+		std::uint64_t MyOwnerPieceUid{};
+		CombatDefinition MyDefinition{};
+	};
+
 	struct BattlePlayerInput
 	{
 		std::string MyPlayerId{};
@@ -773,6 +859,7 @@ namespace Stronghold
 		std::vector<CoreBondEffect> MyCoreBonds{};
 		std::uint64_t MyGainedChess{}; // 当前准备回合获得干员数；天师古鼎等内容使用。
 		std::optional<std::size_t> MyHandUnits{}; // 无显式准备条件时，旧输入可提供手牌数量回退。
+		std::vector<TokenTemplate> MyTokenTemplates{}; // 已按本玩家干员的技能／模组组合，运行时不解析黑板。
 	};
 
 	enum class EnemySpawnTag { NONE, BOSS, PART, BOUNTY, DUCK };
@@ -957,6 +1044,70 @@ namespace Stronghold
 		std::optional<WorldPoint> MyAirPosition{};
 	};
 
+	struct WolfGift
+	{
+		double MyScale{1};
+		double MyDp{};
+		bool MyPaid{};
+	};
+
+	struct TimedPosition
+	{
+		WorldPoint MyPoint{};
+		double MyUntil{};
+	};
+
+	struct TimedTargetMark
+	{
+		UnitId MyTarget{};
+		double MyTime{};
+	};
+
+	struct FunnelRampEntry
+	{
+		UnitId MyTarget{};
+		std::uint64_t MyTick{};
+		double MyScale{};
+	};
+
+	struct LockedDrone
+	{
+		UnitId MyTarget{};
+		std::optional<double> MyScale{};
+	};
+
+	struct DroneDamageQueue
+	{
+		UnitId MyTarget{};
+		std::vector<double> MyScales{};
+		std::size_t MyHead{};
+	};
+
+	struct BombardmentLock
+	{
+		UnitId MyTarget{};
+		WorldPoint MyPoint{};
+		bool MyGone{};
+	};
+
+	struct AlchemyZone
+	{
+		WorldPoint MyPoint{};
+		WorldPoint MyVelocity{};
+		UnitId MyAnchor{};
+		double MyElapsed{};
+		double MyAccumulator{};
+		double MyDuration{};
+		double MyBurnScale{};
+		std::vector<UnitId> MyBurnTargets{};
+	};
+
+	struct FireballCarrier
+	{
+		UnitId MyUnit{};
+		double MyAccumulator{};
+	};
+
 	struct CombatUnit
 	{
 		UnitId MyId{};
@@ -972,6 +1123,10 @@ namespace Stronghold
 		bool MyDownAtHome{};
 		RemovalReason MyRemovalReason{RemovalReason::KILLED};
 		double MyExpiresAt{std::numeric_limits<double>::infinity()};
+		std::optional<TokenCountdown> MyCountdown{};
+		std::size_t MySummonGroup{NoPlayer};
+		double MySummonReadyAt{-std::numeric_limits<double>::infinity()};
+		bool MySummonRetry{};
 		bool MyObstacle{};
 		ObstacleKind MyObstacleKind{ObstacleKind::CRATE};
 		CombatDefinition MyDefinition{};
@@ -983,6 +1138,227 @@ namespace Stronghold
 		unsigned MyTinmanZones{};
 		std::uint64_t MyTinmanZoneSequence{};
 		double MyIndigoAccumulator{};
+		double MyWildmnCostReduction{};
+		bool MyWildmnDeployed{};
+		bool MyOperatorHooksReleased{};
+		double MyGrabdsQuietUntil{-1};
+		std::vector<UnitId> MyHaroldHalf{};
+		UnitId MyPapyrsLock{};
+		bool MyPapyrsAbort{};
+		UnitId MyRockrLock{};
+		double MyRockrOverAt{};
+		bool MyRockrOver{};
+		UnitId MyKazemaDoll{};
+		bool MyKazemaSub{};
+		std::uint64_t MyGravelBuff{};
+		unsigned MyGravelTicks{};
+		double MyTippiLastHit{-std::numeric_limits<double>::infinity()};
+		std::size_t MySkillAura{NoPlayer};
+		std::size_t MyTalentAura{NoPlayer};
+		std::optional<double> MyPreviousAmmo{};
+		double MyBlemshRegenAccumulator{};
+		double MyTokenAuraAccumulator{};
+		std::vector<FunnelRampEntry> MyFunnelRamps{};
+		std::vector<LockedDrone> MyLockedDrones{};
+		std::vector<DroneDamageQueue> MyDroneQueues{};
+		std::vector<UnitId> MyTimeLocked{};
+		double MyTimeLockAccumulator{};
+		std::uint64_t MyPrecisionHits{};
+		bool MyPrecisionBoost{};
+		double MyRmixerActiveAttackAt{-std::numeric_limits<double>::infinity()};
+		double MyRmixerShieldLostAt{-std::numeric_limits<double>::infinity()};
+		double MyRmixerCounterAt{-std::numeric_limits<double>::infinity()};
+		bool MyRmixerInCounter{};
+		std::uint64_t MyRmixerPreSequence{};
+		double MyRmixerPreHealth{};
+		std::vector<UnitId> MyInesWoven{};
+		std::vector<UnitId> MyInesAttackVictims{};
+		std::vector<UnitId> MyInesSpeedVictims{};
+		double MyInesSpeed{};
+		std::string MyInesAttackKey{};
+		std::string MyInesSpeedKey{};
+		std::string MyInesSentryKey{};
+		std::bitset<FieldTiles> MyInesSentry{};
+		std::optional<WorldPoint> MyInesSentryAt{};
+		bool MyInesPlaced{};
+		bool MyInesRetreated{};
+		std::vector<std::uint64_t> MyDeferredHits{};
+		std::uint64_t MyDeferredHitTick{};
+		std::vector<UnitId> MyAromaMarked{};
+		std::vector<UnitId> MyAromaFloating{};
+		UnitId MyShieldDevice{};
+		UnitId MyShieldRecipient{};
+		std::optional<WorldPoint> MyTornado{};
+		double MyTornadoAccumulator{};
+		std::string MyTornadoSlowKey{};
+		std::vector<UnitId> MyHypothermia{};
+		std::string MyGuardHealKey{};
+		bool MyTexas2Killed{};
+		bool MyTexas2Casting{};
+		bool MyTexas2Recast{};
+		std::uint64_t MyTexas2RainVersion{};
+		std::string MyTexas2DotKey{};
+		int MyMudrokLayers{};
+		bool MyMudrokAwake{};
+		double MyMudrokDormantTime{};
+		std::string MyMudrokSlowKey{};
+		bool MyRiposte{};
+		bool MyRiposteNow{};
+		unsigned MyFlameGiven{};
+		double MyFlameAccumulator{};
+		double MyFlameStep{};
+		double MyFartthHurtAt{-std::numeric_limits<double>::infinity()};
+		std::vector<int> MyExtraRangeKeys{};
+		std::vector<int> MyNextExtraRangeKeys{};
+		double MyGvialDebt{};
+		bool MyBillroCharged{};
+		double MyBillroRamp{};
+		std::vector<UnitId> MyBillroMarked{};
+		UnitId MyBandageTarget{};
+		UnitId MyBandageBonus{};
+		bool MyBandageSkipSp{};
+		bool MyNoInspire{};
+		std::optional<double> MyBardRatio{};
+		std::optional<double> MyReaperHeal{};
+		double MyExcuSpent{};
+		bool MyExtraAttack{};
+		std::vector<UnitId> MyVerdictTargets{};
+		std::vector<UnitId> MySleepWards{};
+		std::vector<TimedTargetMark> MySleepStarts{};
+		double MyWardAccumulator{};
+		UnitId MyCandleOwner{};
+		bool MyBlazeDowned{};
+		std::uint64_t MyBlazeDownDeployment{};
+		double MyBlazeAccumulator{};
+		std::bitset<FieldTiles> MyBurnTiles{};
+		std::optional<WorldPoint> MyAnchorHome{};
+		UnitId MyAnchorMarker{};
+		UnitId MyCandleOriginal{};
+		bool MyNoLeak{};
+		bool MyEtlchiReborn{};
+		double MyStolenHealth{};
+		std::vector<UnitId> MyCandles{};
+		std::vector<UnitId> MySickles{};
+		double MySickleAccumulator{};
+		bool MySurtrEmber{};
+		bool MySurtrSolo{};
+		double MySurtrTime{};
+		double MySurtrAccumulator{};
+		std::string MyPasngrEnhanceKey{};
+		unsigned MyPepeKills{};
+		unsigned MyPepeRage{};
+		unsigned MyPepeStacks{};
+		double MyPepeRadius{1};
+		bool MyPepeBoost{};
+		double MyRosmonRadius{};
+		unsigned MyRosmonShocks{};
+		bool MyRosmonSaved{};
+		UnitId MyCelloPartner{};
+		double MyCelloPick{};
+		double MyCelloBoost{1};
+		double MyCelloAccumulator{};
+		std::vector<FireballCarrier> MyReedCarriers{};
+		double MyReedAccumulator{};
+		std::string MyReedFireKey{};
+		std::vector<UnitId> MyHaloLocks{};
+		std::vector<double> MyHaloStay{};
+		unsigned MyHaloStacks{};
+		bool MyHaloLinking{};
+		double MyAgoatAccumulator{};
+		std::string MyAgoatMistKey{};
+		UnitId MySunSword{};
+		unsigned MyDawnTimes{1};
+		bool MyNearlCombo{};
+		bool MyNearlStood{};
+		std::vector<UnitId> MyGoldenLions{};
+		std::vector<UnitId> MySiegeSeen{};
+		std::optional<std::uint64_t> MyBoundSkillActivation{};
+		std::vector<unsigned> MySnow{};
+		std::vector<int> MySnowLast{};
+		double MySnowAccumulator{};
+		double MySnowDamageAccumulator{};
+		unsigned MySnowSpreads{};
+		bool MySnowWaves{};
+		bool MySnowBlessingUsed{};
+		bool MyBlkkgtSlashing{};
+		bool MyBlkkgtFinale{};
+		unsigned MyBlkkgtSlashes{};
+		double MyBlkkgtAccumulator{};
+		double MyBlkkgtPullAccumulator{};
+		std::vector<UnitId> MyBlkkgtSeen{};
+		std::optional<double> MyYuWall{};
+		bool MyYuVertical{};
+		bool MyLumenAbnormal{};
+		double MyLumenReady{};
+		std::string MyLumenRainKey{};
+		unsigned MyQiubaiStacks{};
+		std::vector<UnitId> MyQiubaiBound{};
+		unsigned MyNymphKeys{};
+		double MyWantedTime{};
+		UnitId MyLemuenAim{};
+		double MyLemuenAimTime{};
+		double MyLemuenLockAccumulator{};
+		std::vector<BombardmentLock> MyLemuenLocks{};
+		std::deque<AlchemyZone> MyAlchemyZones{};
+		std::vector<UnitId> MyMlynarHits{};
+		unsigned MyMlynarNear{};
+		unsigned MyMlynarKills{};
+		unsigned MyMlynarPending{};
+		bool MyMlynarUp{};
+		bool MyMlynarKeep{};
+		std::optional<double> MyMlynarRamp{};
+		bool MyF12yinCritical{};
+		double MyGravityAccumulator{};
+		double MyIcicleCooldown{};
+		unsigned MyIcicleRow{};
+		double MyEyeCost{14};
+		std::optional<double> MySvashCostBase{};
+		double MySvashShield{};
+		unsigned MySvashCasts{};
+		bool MySvashSwapped{};
+		double MySvashDpAccumulator{};
+		double MySvashRevealAccumulator{};
+		std::vector<UnitId> MyGhostHeavy{};
+		bool MyDuskSummoned{};
+		double MyDuskUntil{};
+		bool MyHornRevived{};
+		bool MyHornFlare{};
+		bool MyHornOverload{};
+		double MyHornTime{};
+		double MyHornAccumulator{};
+		std::vector<TimedPosition> MyFlares{};
+		double MyAreaHealAccumulator{};
+		double MyAreaAuraAccumulator{};
+		std::string MyFoxKey{};
+		std::vector<double> MyMoteReady{};
+		std::vector<TimedTargetMark> MyMoteHits{};
+		std::string MyMoteKey{};
+		double MyRedistributeAccumulator{};
+		double MyInspireAccumulator{};
+		std::vector<TimedTargetMark> MyVulpisMarks{};
+		bool MyVulpisBusy{};
+		bool MyVulpisKill{};
+		double MyVulpisDuration{1};
+		double MyLastHitAt{-std::numeric_limits<double>::infinity()};
+		double MyPhilaeBarrier{};
+		double MyPhilaeCounterAt{-std::numeric_limits<double>::infinity()};
+		bool MySkadiRevived{};
+		double MySwireCoins{};
+		unsigned MySwireSaves{};
+		double MySwireHealAt{-std::numeric_limits<double>::infinity()};
+		double MySwireBombHold{-1};
+		std::uint64_t MyBombFirstTick{};
+		bool MyHadAttackTarget{};
+		unsigned MyWolfShadows{};
+		bool MyWolfTactical{};
+		bool MyWolfReturning{};
+		std::uint64_t MyWolfFormSequence{};
+		double MyWolfReturnAt{};
+		std::optional<WolfGift> MyWolfGift{};
+		std::optional<WolfGift> MyWolfGiftActive{};
+		std::vector<UnitId> MyWolfMarked{};
+		double MyVigilAccumulator{};
+		double MyVigilDp{};
 		Facing MyFacing{Facing::RIGHT};
 		bool MyGround{true};
 		bool MyGroundPassable{true};

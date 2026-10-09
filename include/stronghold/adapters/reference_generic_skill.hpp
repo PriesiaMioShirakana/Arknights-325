@@ -31,5 +31,7 @@ namespace Stronghold
 		std::string_view MyKey{};
 		std::span<const AttributeChange> MyModifiers{};
 	};
+
+	void AppendPermanentTalents(CombatDefinition& _definition, std::span<const GenericTalentRecord> _talents);
 }
 #endif

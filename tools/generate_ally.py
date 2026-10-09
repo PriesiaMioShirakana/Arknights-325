@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from generate_combat import Tables, quote, number, boolean, record
 from generate_profession import profile, traits
-from generate_generic_skill import build_generic_skill, build_generic_talents
+from generate_generic_skill import build_generic_skill, build_generic_talents, generic_modifiers, numeric
 from generate_operator_kits import build_operator_kit
 
 
@@ -184,6 +184,74 @@ def body(tables, key, raw, token=False, abnormal=(), selection=None):
         if 'isolated' in abnormal: starting.append('ISOLATED')
     damage = raw.get('dmgType') or ('arts' if '法术' in desc else 'true' if '真实' in desc else 'heal' if '恢复' in desc or '治疗' in desc else 'phys') if token else raw.get('dmgType') or ''
     raw_skill = raw.get('skill') or {}
+    token_kit = '{}'
+    if token and key == 'token_10000_silent_healrb':
+        lifetime_skill = raw_skill
+        # 顶层默认身体没有拥有者变体；寿命仍沿原 variantOf 读取第一个变体。
+        if raw is tables.tokens.get(key):
+            lifetime_skill = next(iter(raw.get('variants', {}).values()), {}).get('skill') or raw_skill
+        life = lifetime_skill.get('duration', 0) if lifetime_skill.get('skillId', '').startswith('skcom_withdraw') else 0
+        if not life:
+            match = re.search(r'(\d+(?:\.\d+)?)秒后自动销毁', lifetime_skill.get('desc') or lifetime_skill.get('description') or '')
+            life = float(match[1]) if match else 0
+        limit = st.get('deployLimit', raw.get('deployLimit'))
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::HEAL_DRONE', MyLifetime=number(life),
+            MyDeployLimit=str(max(0, math.floor(limit)))+'U' if limit is not None else '0U', MyCountdown='true')
+    elif token and key == 'token_10022_kazema_shadow':
+        limit = st.get('deployLimit', raw.get('deployLimit'))
+        scale = next(((t.get('bb') or {})['damage_scale'] for t in raw.get('talents', []) if 'damage_scale' in (t.get('bb') or {})), 0)
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::PAPER_DOLL',
+            MyDeployLimit=str(max(0, math.floor(limit)))+'U' if limit is not None else '0U', MyBurstScale=number(scale))
+    elif token and key == 'token_10031_swire2_gdtrap':
+        bb = raw_skill.get('bb') or {}
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::CHAMPAGNE',
+            MyBurstScale=number(bb.get('attack@atk_scale', bb.get('atk_scale', 0))), MySluggish=number(bb.get('attack@sluggish', bb.get('sluggish', 0))),
+            MyMatureTime=number(bb['duration_switch']) if bb.get('duration_switch') is not None else 'std::numeric_limits<double>::infinity()')
+    elif token and key == 'token_10006_vodfox_doll':
+        bb = raw_skill.get('bb') or {}
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::CURSE_DOLL', MyLifetime=number(raw_skill.get('duration', 0)), MyCountdown='true',
+            MyAuraModifiers=generic_modifiers(tables, {dest:bb[src] for src,dest in [('atk','atkPct'),('def','defPct')] if bb.get(src)}))
+    elif token and key == 'token_10028_vigil_wolf':
+        tal = raw.get('talents') or []
+        leader = next((t for t in tal if 'vigil_wolf_t_1_enhance[trigger].max_stack_cnt' in (t.get('bb') or {})), tal[0] if tal else {})
+        lb = leader.get('bb') or {}
+        desc = leader.get('description') or leader.get('desc') or ''
+        maximum = re.search(r'至多(\d+)只', desc)
+        max_count = int(maximum[1]) if maximum else 1 + lb.get('vigil_wolf_t_1_enhance[trigger].max_stack_cnt', 0)
+        pen = next(((t.get('bb') or {})['def_penetrate_fixed'] for t in tal if 'def_penetrate_fixed' in (t.get('bb') or {})), 0)
+        guard = next(((t.get('bb') or {}).get('damage_scale', 1) for t in tal if 'prob' in (t.get('bb') or {})), 1)
+        taunt = next(((t.get('bb') or {})['taunt_level'] for t in tal if 'taunt_level' in (t.get('bb') or {})), 0)
+        bb = raw_skill.get('bb') or {}
+        bonus = next((v for k,v in bb.items() if k.endswith('atk_scale')), 0)
+        wolf = record('WolfPackDefinition', MyInterval=number(max(0, lb.get('vigil_wolf_t_1_enhance[trigger].interval', lb.get('interval', 0)))),
+            MyBlockPerShadow=number(lb.get('vigil_wolf_t_1_enhance[trigger].block_cnt', lb.get('block_cnt', 1))), MyMaxShadows=str(max(1, math.ceil(max_count)))+'U',
+            MyDefenseIgnore=number(pen), MyBlockedReduction=number(guard), MyAdditionScale=number(bonus), MyTaunt=number(taunt))
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::WOLF_PACK', MyWolf=wolf)
+    elif token and key == 'token_10041_cathy_catsld':
+        bb = next((t.get('bb') or {} for t in raw.get('talents') or [] if 'max_shield_ratio' in (t.get('bb') or {})), {})
+        rule = record('CatShieldDefinition', MyIdle=number(bb.get('interval', 0)), MyInterval=number(max(0.000001, bb.get('catsld_t_1[timer][interval].interval', 1))),
+            MyMaxRatio=number(bb.get('max_shield_ratio', 0)), MyRefill=number(bb.get('shield_ratio_each_trigger', 0)))
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::CAT_SHIELD', MyDeployLimit=str(max(0, int(raw.get('deployLimit', st.get('deployLimit', 2)))))+'U', MyCatShield=rule)
+    elif token and key == 'token_10012_rosmon_shield':
+        talent_bb = next((t.get('bb') or {} for t in raw.get('talents') or [] if 'duration' in (t.get('bb') or {})), {})
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::ROSMON_GEAR', MyLifetime=number(talent_bb.get('duration', 0)), MyDeployLimit=str(max(0, int(raw.get('deployLimit', st.get('deployLimit', 0)))))+'U',
+            MyBurstRange=tables.grid(raw_skill.get('rangeGrid') or [[r,c] for r in (1,0,-1) for c in (-1,0,1)]), MyBurstStun=number((raw_skill.get('bb') or {}).get('stun', 0)), MyBlockedDefense=number(talent_bb.get('def', 0)))
+    elif token and key == 'token_10019_nearl2_sword':
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::RADIANT_SWORD', MyBurstScale=number((raw_skill.get('bb') or {}).get('atk_scale', 0)),
+            MyBurstRange=tables.grid(raw_skill.get('rangeGrid') or [[0,0],[1,0],[-1,0],[0,1],[0,-1]]), MyBurstStun=number((raw_skill.get('bb') or {}).get('stun', 0)), MyBlockedScale=number((raw.get('trait') or {}).get('bb', {}).get('atk_scale', 1)))
+    elif token and key == 'token_10040_siege2_vlion':
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::GOLDEN_OATH', MyTrueDamage=boolean('真实伤害' in desc))
+    elif token and key == 'token_10058_sbell2_icetgt':
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::ICE_TARGET', MyDeployLimit='1U')
+    elif token and key == 'token_10015_dusk_drgn':
+        life = next((t.get('bb', {}).get('duration') for t in raw.get('talents') or [] if 'duration' in (t.get('bb') or {})), 0)
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::DUSK_DRAGON', MyLifetime=number(life), MyDeployLimit='1U')
+    elif token and key == 'token_10011_beewax_oblisk':
+        talents_raw = raw.get('talents') or []
+        life = next((t.get('bb', {}).get('duration') for t in talents_raw if 'duration' in (t.get('bb') or {})), 0)
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::OBELISK', MyLifetime=number(life),
+            MyBurstScale=number((raw_skill.get('bb') or {}).get('atk_scale', 0)), MyBurstRange=tables.grid(raw_skill.get('rangeGrid')),
+            MyBurstStun=number((raw_skill.get('bb') or {}).get('stun', 0)), MyLifetimeSpecified=boolean(any('duration' in (t.get('bb') or {}) for t in talents_raw)))
     return record('AllyRecord', MyId=quote(key), MyName=quote(raw.get('name') or key), MyCharacterId=quote(key if token else raw.get('charId') or ''),
         MyProfession=quote((raw.get('profession') or ('TOKEN' if token else 'WARRIOR')).upper()), MySubProfession=quote(raw.get('subProfessionId') or ''),
         MyPosition=quote((raw.get('position') or 'MELEE').upper()), MyStats=stats, MyRange=tables.grid(raw.get('rangeGrid') if raw.get('rangeGrid') is not None else [[0,0],[0,1]]),
@@ -197,7 +265,8 @@ def body(tables, key, raw, token=False, abnormal=(), selection=None):
         MyPreparationPlacement='PlacementClass::'+preparation_placement(raw), MyPreparationRange=tables.grid(preparation_range(raw)),
         MyGenericSkill=build_generic_skill(tables, raw, damage, token), MyGenericTalents=build_generic_talents(tables, raw.get('talents')),
         MyOperatorKit=build_operator_kit(tables, key, raw, token), MyOperatorProfession='OperatorProfession::'+
-            (raw['profession'].upper() if (raw.get('profession') or '').upper() in {'PIONEER','WARRIOR','TANK','SNIPER','CASTER','MEDIC','SUPPORT','SPECIAL'} else 'NONE'))
+            (raw['profession'].upper() if (raw.get('profession') or '').upper() in {'PIONEER','WARRIOR','TANK','SNIPER','CASTER','MEDIC','SUPPORT','SPECIAL'} else 'NONE'), MyTokenKit=token_kit, MyNationId=quote(raw.get('nationId') or ''),
+        MyDeviceShieldRate=number(numeric((raw_skill.get('bb') or {}).get('overwrite_ratio'))) if numeric((raw_skill.get('bb') or {}).get('overwrite_ratio')) is not None else '{}', MyGroupId=quote(raw.get('groupId') or ''))
 
 
 def operator(tables, key, raw, backups, chess):

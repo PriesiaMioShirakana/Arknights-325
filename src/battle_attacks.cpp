@@ -106,9 +106,13 @@ namespace Stronghold
 		++_source.MyTotals.MyAttacks;
 		_source.MyLastAttackAt = Time();
 		auto profile = EffectiveAttack(_source);
+		if (const auto* kit = _source.MyDefinition.MyOperatorKit ? std::get_if<PapyrsKit>(_source.MyDefinition.MyOperatorKit) : nullptr;
+			kit && kit->MyLockSkill && _source.MySkill.MyActive && _source.MyPapyrsLock)
+			profile.MyHealChainCount += kit->MyExtraChains;
 		const auto& skill = _source.MyDefinition.MySkill;
 		profile.MySkillDamage = _source.MySkill.MyActive && (skill.MyAttack || !skill.MyRange.empty() || skill.MyRangeExtend != 0 || skill.MyNoRangeExtend);
 		if (profile.MyFortress && _source.MyProfession.MyFortressMelee) profile.MyRanged = false;
+		if (_source.MyDefinition.MyOperatorKit && !_source.MyOperatorHooksReleased) OperatorAttackProfile(_source, profile);
 		const auto attackId = ++_MyAttackSequence;
 		const bool initialPosition = _source.MySkill.MyActive && UsesInitialPosition(_source);
 		const auto sourceLife = _source.MyDeploySequence;
@@ -158,6 +162,9 @@ namespace Stronghold
 		bool _initialPosition
 	) noexcept
 	{
+		if (const auto* mlynar = _source.MyDefinition.MyOperatorKit ? std::get_if<MlynarKit>(_source.MyDefinition.MyOperatorKit) : nullptr)
+			return std::isgreaterequal(static_cast<double>(_source.MyMlynarNear), mlynar->MyNearCount) ? mlynar->MyNearScale : mlynar->MyAttackScale;
+		if (const auto* f12yin = _source.MyDefinition.MyOperatorKit ? std::get_if<F12yinKit>(_source.MyDefinition.MyOperatorKit) : nullptr) return _source.MyF12yinCritical ? f12yin->MyCriticalScale : 1;
 		const auto forward = RotateOffset(RangeOffset{.MyColumn = 1}, _source.MyFacing);
 		const auto origin = _initialPosition ? _source.MyHome : _source.MyPosition;
 		const auto row = static_cast<int>(std::floor(origin.MyY + 0.5));
@@ -170,12 +177,15 @@ namespace Stronghold
 		{
 			auto& state = _source.MyProfession;
 			const auto& definition = _source.MyDefinition.MyProfession;
+			const auto* rockr = _source.MyDefinition.MyOperatorKit ? std::get_if<RockrKit>(_source.MyDefinition.MyOperatorKit) : nullptr;
+			const auto maximum = definition.MyFunnelMax * (rockr && _source.MyRockrOver ? rockr->MyOverloadScale : 1);
 			state.MyFunnelScale = state.MyFunnelTarget == _target.MyId
-				? std::min(definition.MyFunnelMax, state.MyFunnelScale + definition.MyFunnelDelta) : definition.MyFunnelInitial;
+				? std::min(maximum, state.MyFunnelScale + definition.MyFunnelDelta) : definition.MyFunnelInitial;
 			state.MyFunnelTarget = _target.MyId;
 			return state.MyFunnelScale;
 		}
 		case AttackScaling::FLYING: return _target.Flying() ? _profile.MyConditionalScale : 1;
+		case AttackScaling::BLOCKED: return _target.MyBlockedBy ? _profile.MyConditionalScale : 1;
 		case AttackScaling::UNBLOCKED: return _target.MyBlockedBy == _source.MyId ? 1 : _profile.MyConditionalScale;
 		case AttackScaling::DISTANT:
 			return _target.MyBlockedBy == _source.MyId || BodyOnTile(_target, row, column) ||
@@ -214,17 +224,24 @@ namespace Stronghold
 		if (_target && Unit(_target).MyAlive)
 		{
 			double dealt = 0;
-			const auto mainAmount = amount * MainAttackMultiplier(source, Unit(_target), _profile, _initialPosition);
-			for (unsigned hit = 0; hit < _profile.MyHits && Unit(_target).MyAlive && !Finished(); ++hit)
+			auto multiplier = _profile.MyLockedFunnel ? LockedFunnelMultiplier(source, _target) : _profile.MyPerTargetFunnel ? PerTargetFunnel(source, _target) : MainAttackMultiplier(source, Unit(_target), _profile, _initialPosition);
+			if (_profile.MyCriticalProbability && std::isless(_MyRandom.Next(), *_profile.MyCriticalProbability)) multiplier *= _profile.MyCriticalScale;
+			const auto mainAmount = amount * multiplier;
+			auto hits = source.MyDefinition.MyTokenKit && source.MyDefinition.MyTokenKit->MyKind == TokenKitKind::WOLF_PACK ? std::max(1U, source.MyWolfShadows) : _profile.MyHits;
+			if (_profile.MyProgressiveHits)
+				if (const auto* kit = source.MyDefinition.MyOperatorKit ? std::get_if<PrecisionKit>(source.MyDefinition.MyOperatorKit) : nullptr)
+					hits = std::isgreaterequal(static_cast<double>(source.MyPrecisionHits), kit->MyUpgradeAfter) ? kit->MyUpgradedHits : kit->MyInitialHits;
+			for (unsigned hit = 0; hit < hits && Unit(_target).MyAlive && !Finished(); ++hit)
 				dealt += DealDamage(_source, _target, DamageInfo{.MyAmount = mainAmount, .MyType = _profile.MyDamageType,
 					.MyMultiplier = _profile.MyHitMultiplier.value_or(1), .MyHitSleep = _profile.MyHitSleep,
-					.MyNoSp = _profile.MyHitMultiplier.has_value() && hit != 0, .MyIsAttack = true, .MyIsSkill = _profile.MySkillDamage});
+					.MyNoSp = _profile.MyHitMultiplier.has_value() && hit != 0, .MyTags = _profile.MyTags, .MyIsAttack = true, .MyIsSkill = _profile.MySkillDamage});
 			if (_profile.MyOnHitStatus && Unit(_target).MyAlive)
 			{
 				auto application = _profile.MyOnHitApplication;
 				application.MySource = _source;
 				(void)ApplyStatus(_target, *_profile.MyOnHitStatus, application);
 			}
+			if (_profile.MyOperatorEachHit) OperatorEachHit(_source, _target, _profile);
 			ContentEvent event{.MyKind = ContentEventKind::ATTACK_HIT, .MySource = _source, .MyTarget = _target, .MyAmount = dealt};
 			NotifyContent(event);
 			totalDealt += dealt;
@@ -241,8 +258,9 @@ namespace Stronghold
 					target.MyStatuses.Has(CombatStatus::UNTARGETABLE) || (target.MySide == UnitSide::ENEMY && EnemyStealthed(target)) || (target.Flying() && (_profile.MyGroundOnly ||
 					(!_profile.MyCanHitFlying && !_profile.MySplashHitsFlying))) ||
 					std::isgreater(Distance(_point, target.MyPosition), _profile.MySplashRadius + 1e-9)) continue;
-				const auto dealt = DealDamage(_source, target.MyId, DamageInfo{.MyAmount = amount * _profile.MySplashScale, .MyType = _profile.MyDamageType, .MyIsAttack = true, .MyIsSplash = true, .MyIsSkill = _profile.MySkillDamage});
+				const auto dealt = DealDamage(_source, target.MyId, DamageInfo{.MyAmount = amount * _profile.MySplashScale, .MyType = _profile.MyDamageType, .MyTags = _profile.MyTags, .MyIsAttack = true, .MyIsSplash = true, .MyIsSkill = _profile.MySkillDamage});
 				totalDealt += dealt;
+				if (_profile.MyOperatorEachHit) OperatorEachHit(_source, target.MyId, _profile, false);
 				ContentEvent event{.MyKind = ContentEventKind::ATTACK_HIT, .MySource = _source, .MyTarget = target.MyId, .MyAmount = dealt, .MySplash = true};
 				NotifyContent(event);
 			}
@@ -269,9 +287,10 @@ namespace Stronghold
 				scratch.MySeen.emplace_back(best);
 				Emit(BattleEventKind::ATTACKED, previous, best);
 				const auto dealt = DealDamage(_source, best, DamageInfo{.MyAmount = amount * std::pow(1 - _profile.MyChainFalloff, bounce), .MyType = _profile.MyDamageType,
-					.MyTags = static_cast<DamageTags>(DamageTag::CHAIN), .MyIsAttack = true, .MyIsSkill = _profile.MySkillDamage});
+					.MyTags = _profile.MyTags | DamageTag::CHAIN, .MyIsAttack = true, .MyIsSkill = _profile.MySkillDamage});
 				totalDealt += dealt;
 				if (std::isgreater(_profile.MyChainSluggish, 0) && Unit(best).MyAlive) (void)ApplyStatus(best, CombatStatus::SLUGGISH, _profile.MyChainSluggish, _source);
+				if (_profile.MyOperatorEachHit) OperatorEachHit(_source, best, _profile, false);
 				ContentEvent event{.MyKind = ContentEventKind::ATTACK_HIT, .MySource = _source, .MyTarget = best, .MyAmount = dealt, .MyChain = true};
 				NotifyContent(event);
 				previous = best;
@@ -282,7 +301,7 @@ namespace Stronghold
 			for (unsigned i = 0; i < source.MyDefinition.MyProfession.MyShockCount; ++i)
 				Schedule(ScheduledAction{.MyAt = Time() + 0.3 * (i + 1.0), .MyKind = ScheduledKind::AFTERSHOCK,
 					.MySource = _source, .MyPoint = _point});
-		if (source.MyDefinition.MyOperatorKit) OperatorAfterHit(_source, _target);
+		if (source.MyDefinition.MyOperatorKit) OperatorAfterHit(_source, _target, _profile, _point, totalDealt);
 		if (_profile.MyGenericHit) GenericHit(_source, _target, totalDealt);
 	}
 
@@ -322,6 +341,25 @@ namespace Stronghold
 			(void)Heal(_source.MyId, best, amount * std::pow(1 - _profile.MyHealChainFalloff, bounce));
 			previous = best;
 		}
+		OperatorHealHit(_source.MyId, _target);
+	}
+
+	void Battle::LaunchSkillProjectile(UnitId _source, UnitId _target, double _speed, const DirectProjectileHit& _hit, std::optional<WorldPoint> _from, std::size_t _chain)
+	{
+		const auto& source = Unit(_source); const auto& target = Unit(_target);
+		if (std::isgreater(_hit.MyBounceRadius, 0))
+		{
+			if (_chain == NoPlayer)
+			{
+				if (_MyFreeProjectileChains.empty()) { _chain = _MyProjectileChains.size(); _MyProjectileChains.emplace_back(); }
+				else { _chain = _MyFreeProjectileChains.back(); _MyFreeProjectileChains.pop_back(); }
+				_MyProjectileChains[_chain].clear();
+				_MyProjectileChains[_chain].reserve(_hit.MyHits);
+			}
+			_MyProjectileChains[_chain].push_back(_target);
+		}
+		_MyProjectiles.emplace_back(Projectile{.MySource = _source, .MyTarget = _target, .MyTargetLife = target.MyDeploySequence,
+			.MyPosition = _from.value_or(source.MyPosition), .MySpeed = _speed, .MyDestination = target.MyPosition, .MyDirectHit = _hit, .MyChain = _chain});
 	}
 
 	void Battle::UpdateProjectiles()
@@ -335,7 +373,7 @@ namespace Stronghold
 			{
 				const auto& target = Unit(projectile.MyTarget);
 				if (target.MyAlive && !target.MyHidden && target.MyDeploySequence == projectile.MyTargetLife) projectile.MyDestination = target.MyPosition;
-				else if (!std::isgreater(projectile.MyProfile.MySplashRadius, 0) && !projectile.MyProfile.MyBoomerang && !projectile.MyReturning) continue;
+				else if (!std::isgreater(projectile.MyProfile.MySplashRadius, 0) && !projectile.MyProfile.MyBoomerang && !projectile.MyReturning && !(projectile.MyDirectHit && std::isgreater(projectile.MyDirectHit->MyBounceRadius, 0))) continue;
 				else projectile.MyTarget = 0;
 			}
 			const auto distance = Distance(projectile.MyDestination, projectile.MyPosition);
@@ -355,6 +393,32 @@ namespace Stronghold
 			if (Finished()) break;
 			const auto target = projectile.MyTarget && Unit(projectile.MyTarget).MyAlive && Unit(projectile.MyTarget).MyDeploySequence == projectile.MyTargetLife ? projectile.MyTarget : 0;
 			auto& source = _MyUnits[Index(projectile.MySource)];
+			if (projectile.MyDirectHit)
+			{
+				const auto& hit = *projectile.MyDirectHit;
+				if (target)
+				{
+					const auto& enemy = Unit(target);
+					const bool still = enemy.MyBlockedBy || enemy.MyStatuses.Has(CombatStatus::STUN) || enemy.MyStatuses.Has(CombatStatus::NO_MOVE) || !enemy.MyMoving;
+					const auto scale = still ? hit.MyStillScale.value_or(hit.MyScale) : hit.MyScale;
+					for (unsigned i = 0; i < hit.MyHits && Unit(target).MyAlive && !Finished(); ++i)
+					{
+						const auto multiplier = hit.MyProfileScale ? MainAttackMultiplier(source, Unit(target), source.MyDefinition.MyAttack, false) : 1;
+						(void)DealDamage(source.MyId, target, {.MyAmount = source.MyStats.MyAttack * scale * multiplier, .MyType = hit.MyType, .MyTags = hit.MyTags, .MyIsSkill = true});
+					}
+				}
+				if (projectile.MyChain != NoPlayer)
+				{
+					const auto next = hit.MyHits > 1 ? NearestProjectileTarget(source.MyId, projectile.MyDestination, hit.MyBounceRadius, _MyProjectileChains[projectile.MyChain]) : UnitId{};
+					if (next)
+					{
+						auto bounce = hit; --bounce.MyHits;
+						LaunchSkillProjectile(source.MyId, next, projectile.MySpeed, bounce, projectile.MyDestination, projectile.MyChain);
+					}
+					else { _MyProjectileChains[projectile.MyChain].clear(); _MyFreeProjectileChains.push_back(projectile.MyChain); }
+				}
+				continue;
+			}
 			if (projectile.MyReturning)
 			{
 				if (source.MyAlive && source.MyDeploySequence == projectile.MySourceLife && source.MyProfession.MyBoomerangsOut)

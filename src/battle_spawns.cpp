@@ -64,14 +64,16 @@ namespace Stronghold
 		if (!Deploy(unit))
 		{
 			unit.MyRemoved = true;
+			if (unit.MyDefinition.MyOperatorKit) _MyPendingOperatorReleases.push_back(unit.MyId);
 			RetireContent(unit.MyId, 0);
 			return 0;
 		}
 		if (_spawn.MyHealth && unit.MyAlive) unit.MyHealth = std::clamp(*_spawn.MyHealth, 1.0, unit.MyStats.MyMaxHealth);
 		if (std::isgreater(_spawn.MyDuration, 0))
 		{
-			unit.MyExpiresAt = Time() + _spawn.MyDuration;
-			Schedule(ScheduledAction{.MyAt = unit.MyExpiresAt, .MyKind = ScheduledKind::TOKEN_EXPIRE, .MyTarget = unit.MyId});
+			unit.MyExpiresAt = std::min(unit.MyExpiresAt, Time() + _spawn.MyDuration);
+			if (unit.MyCountdown) unit.MyCountdown->MyUntil = unit.MyExpiresAt;
+			Schedule(ScheduledAction{.MyAt = unit.MyExpiresAt, .MyKind = ScheduledKind::TOKEN_EXPIRE, .MyTarget = unit.MyId, .MyVersion = unit.MyDeploySequence});
 		}
 		return unit.MyId;
 	}
@@ -253,6 +255,8 @@ namespace Stronghold
 		// 本次退场事件先结算；关闭保留时，获授特质及其属性不会带入下一次部署。
 		if (RevokeGrantedGarrisons(_unit.MyId) && _unit.MyKind == UnitKind::OPERATOR && !_unit.MyAlive && !_unit.MyRemoved)
 			_unit.MyRespawnAt = _unit.MyRemovedAt + std::max(0.0, _unit.MyStats.MyRedeploySeconds * _unit.MyStats.MyRedeployMultiplier);
+		if (_unit.MyRemoved && !_unit.MyAlive && _unit.MyDefinition.MyOperatorKit && !_unit.MyOperatorHooksReleased)
+			_MyPendingOperatorReleases.push_back(_unit.MyId);
 		if (_unit.MyRemoved && !_unit.MyAlive && _reason != RemovalReason::LEAK)
 		{
 			RetireContent(_unit.MyId, 0);

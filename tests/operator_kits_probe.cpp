@@ -31,7 +31,10 @@ namespace
 				<< u.MyStatuses.Has(CombatStatus::DISARM) << ',' << u.MyTotals.MyHealing << ',' << u.MyTotals.MyDamage << ",[";
 			for (std::size_t j = 0; j < u.MyElements.MyGauges.size(); ++j) { if (j) std::cout << ','; std::cout << u.MyElements.MyGauges[j]; }
 			std::cout << "]," << u.MyStatuses.Has(CombatStatus::SILENCE) << ',' << u.MyStatuses.Has(CombatStatus::BURST_LOCK) << ',' << u.MyStatuses.Has(CombatStatus::NO_HEAL) << ',' << s.MyHealthRegen << ',' << u.MyTinmanZones << ','
-				<< u.MyProfession.MyStored << ',' << u.MyStatuses.MyRemaining[static_cast<std::size_t>(CombatStatus::BIND)] << ',' << s.MyBlockCount << ',' << s.MyPhysicalTakenMultiplier << ',' << s.MyArtsTakenMultiplier << ']';
+				<< u.MyProfession.MyStored << ',' << u.MyStatuses.MyRemaining[static_cast<std::size_t>(CombatStatus::BIND)] << ',' << s.MyBlockCount << ',' << s.MyPhysicalTakenMultiplier << ',' << s.MyArtsTakenMultiplier << ',' << u.MyRemoved << ','
+				<< u.MyPosition.MyX << ',' << u.MyPosition.MyY << ',' << u.MyDefinition.MyStats.MyDeploymentCost << ',' << u.MyWildmnCostReduction << ',';
+			const auto block = std::ranges::find(u.MyBuffs, std::string_view("liskam:block"), [](const auto& _buff) { return std::string_view(_buff.MyDefinition.MyKey); });
+			std::cout << (block == u.MyBuffs.end() ? 0 : block->MyRemaining) << ']';
 		}
 		std::cout << "]]";
 	}
@@ -57,11 +60,12 @@ namespace
 			input.MyPlayers[0].MyUnits.push_back({.MyPieceUid = 4, .MyDefinition = std::move(clone), .MyPosition = {5, 10}});
 		}
 		input.MyPlayers.push_back({.MyPlayerId = "q", .MyUnits = {{.MyPieceUid = 5, .MyDefinition = Buddy(mixed), .MyPosition = stress ? WorldPoint{6, 8} : WorldPoint{12, 9}}}});
+		if (scene == 12 || scene == 13) input.MyPlayers[0].MyUnits[2].MyDefinition.MyStats.MyDeploymentCost = 11;
 		Battle b(std::move(input)); b.Start();
 		std::vector<UnitId> enemies;
 		for (unsigned i = 0; i < 5; ++i)
 		{
-			CombatDefinition e{.MyId = "enemy", .MyStats = {.MyMaxHealth = 2000000, .MyAttack = 10, .MyDefense = 40, .MyResistance = 20, .MyMoveSpeed = 0},
+			CombatDefinition e{.MyId = "enemy", .MyStats = {.MyMaxHealth = 2000000, .MyAttack = 10, .MyDefense = 40, .MyResistance = 20, .MyMoveSpeed = 0, .MyMass = 1},
 				.MyAttack = {.MyDisabled = true, .MyRanged = i == 1, .MyEnemyRange = i == 1 ? 2.0 : 0.0}};
 			if (i % 2 == 0) e.MyEnemyTags = {"seamonster"};
 			e.MyElite = i == 2; e.MyLeader = i == 3;
@@ -153,7 +157,11 @@ namespace
 					for (const auto tags : {static_cast<DamageTags>(DamageTag::DOT), static_cast<DamageTags>(DamageTag::BURST), DamageTags{}})
 						(void)b.DealDamage(2, enemies[2], {.MyAmount = 100, .MyType = DamageType::TRUE_DAMAGE, .MyCanDodge = false, .MyTags = tags});
 				if (tick == 2000) b.Retreat(1, true);
-				if (dual && tick == 2100) b.Retreat(4, true);
+				if (dual && tick == 2100) { (void)b.Redeploy(4, true); b.Retreat(4, true); }
+				if ((scene == 8 || scene == 9) && (tick == 2050 || tick == 2200))
+				{
+					const std::array<UnitId, 1> targets{enemies[0]}; (void)b.ForceAttack(2, targets);
+				}
 			}
 			if (scene >= 10)
 			{
@@ -163,6 +171,24 @@ namespace
 				if (tick == 205) for (const auto type : {DamageType::PHYSICAL, DamageType::ARTS, DamageType::TRUE_DAMAGE})
 					(void)b.DealDamage(enemies[2], 1, {.MyAmount = 100, .MyType = type, .MyCanDodge = false});
 				if (tick == 250) (void)b.Heal(1, 1, b.Unit(1).MyStats.MyMaxHealth, {.MySelf = true});
+			}
+			if (scene == 12 || scene == 13)
+			{
+				if (tick == 20 || tick == 600 || tick == 1990) b.Retreat(3);
+				if ((tick >= 50 && tick <= 200 && tick % 30 == 20) || tick == 650 || tick == 680 || tick == 1995)
+				{ b.Retreat(1); (void)b.Redeploy(1, true); }
+				if (tick == 240 || tick == 720 || tick == 2200) (void)b.Redeploy(3, false);
+			}
+			if (scene == 14 || scene == 15)
+			{
+				if (tick == 1 || tick == 601)
+					for (const auto ally : {UnitId{2}, UnitId{3}, static_cast<UnitId>(allyCount)}) { b.EndSkill(ally); b.SetSpTotal(ally, 0); }
+				if (tick % 31 == 0 && b.Unit(1).MyAlive && std::isgreater(b.Unit(1).MyHealth, 300))
+				{
+					const auto n = (tick / 31) % 5;
+					(void)b.DealDamage(enemies[2], 1, {.MyAmount = n == 4 ? 0.0 : 70.0, .MyType = n == 0 ? DamageType::PHYSICAL : n == 1 ? DamageType::ARTS : DamageType::TRUE_DAMAGE,
+						.MyCanDodge = false, .MyNoSp = n == 3, .MyTags = static_cast<DamageTags>(DamageTag::DOT)});
+				}
 			}
 			b.Step(); if (tick % 30 == 0) { std::cout << ','; Snapshot(b); }
 		}

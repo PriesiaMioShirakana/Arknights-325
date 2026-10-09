@@ -2,6 +2,14 @@
 
 namespace Stronghold
 {
+	void AppendPermanentTalents(CombatDefinition& _definition, std::span<const GenericTalentRecord> _talents)
+	{
+		_definition.MyInitialBuffs.reserve(_definition.MyInitialBuffs.size() + _talents.size());
+		for (const auto& talent : _talents)
+			_definition.MyInitialBuffs.push_back({.MyKey = std::string(talent.MyKey),
+				.MyModifiers = std::vector<AttributeChange>(talent.MyModifiers.begin(), talent.MyModifiers.end()), .MyPersistent = true, .MyAllowDead = true});
+	}
+
 	CombatDefinition AllyRecord::MakeGenericDefinition(bool _talents) const
 	{ return MakeDefinitionWithSkill(MyGenericSkill, _talents); }
 
@@ -33,7 +41,7 @@ namespace Stronghold
 			skill.MyRange.assign(spec.MyRange.begin(), spec.MyRange.end());
 			skill.MyRangeExtend = spec.MyRangeExtend;
 			skill.MyModifiers.assign(spec.MyModifiers.begin(), spec.MyModifiers.end());
-			if (spec.MyHasAttack || spec.MyMaxTargets)
+			if (spec.MyHasAttack || spec.MyMaxTargets || spec.MyNoAttack)
 			{
 				auto attack = MyBaseAttack;
 				if (spec.MyDamageType) { attack.MyDamageType = *spec.MyDamageType; attack.MyHealing = false; }
@@ -48,13 +56,7 @@ namespace Stronghold
 			}
 			definition.MyGenericSkill = &spec.MyEffects;
 		}
-		if (_talents)
-		{
-			definition.MyInitialBuffs.reserve(MyGenericTalents.size());
-			for (const auto& talent : MyGenericTalents)
-				definition.MyInitialBuffs.push_back({.MyKey = std::string(talent.MyKey),
-					.MyModifiers = std::vector<AttributeChange>(talent.MyModifiers.begin(), talent.MyModifiers.end()), .MyPersistent = true, .MyAllowDead = true});
-		}
+		if (_talents) AppendPermanentTalents(definition, MyGenericTalents);
 		return definition;
 	}
 }

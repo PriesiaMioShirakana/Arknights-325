@@ -52,6 +52,7 @@ namespace Stronghold
 		_enemy.MyMoving = false;
 		_MyUnits[Index(best)].MyBlocking.emplace_back(_enemy.MyId);
 		Emit(BattleEventKind::BLOCKED, best, _enemy.MyId);
+		WolfBlocked(best, _enemy.MyId);
 		// 原 devices.js：无攻击能力的敌人也会在一个攻击间隔后破坏阻隔工事。
 		if (const auto& blocker = Unit(best); blocker.MyKind == UnitKind::DEVICE && blocker.MyDefinition.MyId == "trap_1105_accrate")
 		{
@@ -213,6 +214,7 @@ namespace Stronghold
 
 	void Battle::Leak(CombatUnit& _unit, bool _timeout)
 	{
+		if (_unit.MyNoLeak) return;
 		if (SpawnDefinition(_unit.MySpawnIndex).MyCounted) ++_MyLeaked;
 		auto owner = _unit.MyOwner;
 		if (!_timeout)

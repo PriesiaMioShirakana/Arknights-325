@@ -75,6 +75,10 @@ namespace Stronghold
 		std::span<const GenericTalentRecord> MyGenericTalents{};
 		const OperatorKitRecord* MyOperatorKit{};
 		OperatorProfession MyOperatorProfession{};
+		std::optional<TokenKitDefinition> MyTokenKit{};
+		std::string_view MyNationId{};
+		std::optional<double> MyDeviceShieldRate{};
+		std::string_view MyGroupId{};
 
 		[[nodiscard]] CombatDefinition MakeGenericDefinition(bool _talents = false) const;
 		[[nodiscard]] CombatDefinition MakeKitDefinition(bool _genericTalents = false) const;
@@ -88,7 +92,8 @@ namespace Stronghold
 				.MyRange = std::vector<RangeOffset>(MyRange.begin(), MyRange.end()),
 				.MyImmunities = StatusFlags(MyImmunities), .MySkill = std::move(_skill),
 				.MyTraitFrontRange = MyHasTraitFrontRange ? std::optional(std::vector<RangeOffset>(MyTraitFrontRange.begin(), MyTraitFrontRange.end())) : std::nullopt,
-				.MyProfession = MyProfessionTraits, .MyOperatorProfession = MyOperatorProfession};
+				.MyProfession = MyProfessionTraits, .MyIdentity = {.MyMeleePosition = MyPosition == "MELEE", .MyCharacterId = std::string(MyCharacterId), .MyNationId = std::string(MyNationId), .MyGroupId = std::string(MyGroupId)},
+				.MyOperatorProfession = MyOperatorProfession, .MyOriginalDeploymentCost = MyStats.MyDeploymentCost, .MyDeviceShieldRate = MyDeviceShieldRate};
 		}
 
 	private:

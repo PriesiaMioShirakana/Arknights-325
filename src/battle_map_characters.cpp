@@ -41,6 +41,7 @@ namespace Stronghold
 
 	void Battle::InstallUnitEffects(CombatUnit& _unit)
 	{
+		InstallTokenKit(_unit);
 		for (const auto& buff : _unit.MyDefinition.MyInitialBuffs) (void)AddBuff(_unit.MyId, buff);
 		if (_unit.MyDefinition.MyMedic) _MyMedics.push_back(_unit.MyId);
 		InstallEquipmentEffects(_unit);

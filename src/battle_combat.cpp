@@ -171,6 +171,7 @@ namespace Stronghold
 			return;
 		if (!ProfessionCanAttack(_unit) || !OperatorCanAttack(_unit)) { StoreEnergy(_unit); return; }
 		auto targets = AllyTargets(_unit);
+		_unit.MyHadAttackTarget = !targets.empty();
 		if (targets.empty() && !UsesInitialPosition(_unit)) { StoreEnergy(_unit); return; }
 		if (SkillAboutToAttack(_unit))
 		{
@@ -269,19 +270,20 @@ namespace Stronghold
 	double Battle::DealDamage(UnitId _source, UnitId _target, const DamageInfo& _damage)
 	{
 		auto damage = _damage;
+		damage.MySequence = ++_MyDamageSequence;
 		if (!std::isfinite(damage.MyAmount) || std::isless(damage.MyAmount, 0) ||
 			!std::isfinite(damage.MyMultiplier) || std::isless(damage.MyMultiplier, 0) ||
 			static_cast<unsigned>(damage.MyType) > static_cast<unsigned>(DamageType::ELEMENTAL))
 			throw std::invalid_argument("invalid battle damage");
 		if (damage.MyTraitAlly) (void)Index(damage.MyTraitAlly);
 		const auto targetIndex = Index(_target);
-		if (_source) (void)Index(_source);
+		if (_source) damage.MyHitSleep |= Unit(_source).MyDefinition.MyAttack.MyHitSleep;
 		auto& target = _MyUnits[targetIndex];
 		if (!_MyStarted || Finished() || !target.MyAlive || target.MyHidden || target.MyStatuses.Has(CombatStatus::INVULNERABLE) ||
 			(target.MyStatuses.Has(CombatStatus::SLEEP) && !damage.MyHitSleep) ||
 			(!damage.MySourceless && !damage.MyIgnoreSelect && _source && target.MySide == UnitSide::ALLY &&
 				target.MyStatuses.Has(CombatStatus::LIFTOFF) && !Unit(_source).Flying())) return 0;
-		if (!_MyContentInstances.empty() || _MyBandHitEffects || _MyEquipmentHitEffects || _MyBondHitEffects || _MyTinmanWither || !_MyGarrisons.empty() ||
+		if (!_MyContentInstances.empty() || _MyBandHitEffects || _MyEquipmentHitEffects || _MyBondHitEffects || _MyTinmanWither || !_MyGarrisons.empty() || !_MyWolves.empty() || !_MyRosesas.empty() || !_MyGladys.empty() || !_MyCetsyrs.empty() || !_MyEtlchis.empty() || !_MyLemuens.empty() || !_MyYus.empty() || !_MySiege2s.empty() || !_MyHalo2s.empty() || !_MyCellos.empty() ||
 			target.MyDefinition.MyOperatorKit || (_source && Unit(_source).MyDefinition.MyOperatorKit))
 		{
 			ContentEvent event{.MyKind = ContentEventKind::BEFORE_DAMAGE, .MySource = damage.MySourceless ? 0 : _source, .MyTarget = _target, .MyDamage = damage, .MyCredit = _source};

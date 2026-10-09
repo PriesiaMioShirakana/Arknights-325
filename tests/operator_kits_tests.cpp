@@ -148,7 +148,10 @@ namespace
 		Check(Close(Gauge(battle, normal, Element::BURN), 950)); Check(Close(Gauge(battle, normal, Element::APOPTOSIS), 950));
 		const auto lingering = Enemy(battle, {9, 9}); battle.Retreat(1, true);
 		(void)battle.DealDamage(1, lingering, {.MyAmount = 10, .MyType = DamageType::ARTS, .MyTags = static_cast<DamageTags>(DamageTag::DOT)});
-		Check(Close(Gauge(battle, lingering, Element::NEURAL), 100)); // 来源退场后的持续伤害仍可附加元素。
+		Check(Close(Gauge(battle, lingering, Element::NEURAL), 100)); // 永久退场当帧尚未释放监听，仍可附加元素。
+		battle.Step(); const auto afterRelease = Gauge(battle, lingering, Element::NEURAL);
+		(void)battle.DealDamage(1, lingering, {.MyAmount = 10, .MyType = DamageType::ARTS, .MyTags = static_cast<DamageTags>(DamageTag::DOT)});
+		Check(Close(Gauge(battle, lingering, Element::NEURAL), afterRelease)); // 永久移除者的监听在帧末释放。
 	}
 
 	BattleInput TinmanInput(const OperatorKitDefinition& _kit, RulePositionMode _mode = RulePositionMode::CURRENT)
@@ -394,6 +397,173 @@ namespace
 		battle.EndSkill(1); Check(battle.Unit(1).MyStats.MyBlockCount == 1); Check(Close(battle.Unit(1).MyStats.MyHealthRegen, 0));
 		battle.Step(); Check(battle.Unit(enemy).MyBlockedBy == 1);
 	}
+
+	void OperatorHookCleanup()
+	{
+		const std::array<OperatorKitDefinition, 3> kits{IndigoKit{}, VignaKit{}, ProveKit{.MyHunt = true}};
+		for (const auto& kit : kits)
+			for (const bool permanent : {false, true})
+			{
+				Battle battle(Input(kit)); battle.Start(); const auto enemy = Enemy(battle, {7, 9}, 1);
+				(void)battle.LoseHealth(0, enemy, 1); const std::array<UnitId, 1> target{enemy};
+				battle.Retreat(1, permanent); Check(!battle.ForceAttack(2, target)); // 本帧监听尚在。
+				battle.Step(); Check(battle.ForceAttack(2, target) == permanent);
+				Check(battle.Unit(2).MyTotals.MyAttacks == (permanent ? 1 : 0));
+			}
+	}
+
+	void WildmnDiscounts()
+	{
+		for (const bool elite : {false, true})
+			for (const bool permanent : {false, true})
+			{
+				const OperatorKitDefinition kit = WildmnKit{.MyCostCap = elite ? 5.0 : 1.0, .MyEveryDeploy = elite};
+				auto input = Input(kit); auto& allies = input.MyPlayers[0].MyUnits;
+				allies[1].MyDeferred = true; allies[1].MyDefinition.MyOperatorProfession = OperatorProfession::WARRIOR;
+				allies[1].MyDefinition.MyStats.MyDeploymentCost = 10;
+				auto cheap = allies[1]; cheap.MyPieceUid = 3; cheap.MyPosition = {7, 9}; cheap.MyDefinition.MyStats.MyDeploymentCost = 2;
+				allies.push_back(std::move(cheap));
+				auto token = allies[1]; token.MyPieceUid = 4; token.MyKind = UnitKind::TOKEN; token.MyPosition = {8, 9}; allies.push_back(std::move(token));
+				auto other = allies[1]; other.MyPieceUid = 5; other.MyPosition = {9, 9};
+				input.MyPlayers.push_back({.MyPlayerId = "q", .MyUnits = {std::move(other)}});
+				Battle battle(std::move(input)); battle.Start();
+				Check(Close(battle.Unit(2).MyDefinition.MyStats.MyDeploymentCost, 9));
+				for (unsigned i = 0; i < 8; ++i) { battle.Retreat(1); Check(battle.Redeploy(1, true)); }
+				Check(Close(battle.Unit(2).MyWildmnCostReduction, elite ? 5 : 1));
+				Check(Close(battle.Unit(3).MyDefinition.MyStats.MyDeploymentCost, elite ? 0 : 1));
+				Check(Close(battle.Unit(4).MyDefinition.MyStats.MyDeploymentCost, 10));
+				Check(Close(battle.Unit(5).MyDefinition.MyStats.MyDeploymentCost, 10));
+				battle.Retreat(1, permanent); battle.Step(); (void)battle.AddDp("p", 99);
+				const auto dp = battle.Players()[0].MyDp, price = battle.Unit(2).MyDefinition.MyStats.MyDeploymentCost;
+				Check(battle.Redeploy(2, false)); Check(Close(battle.Players()[0].MyDp, dp - price));
+				// 永久释放全部来源监听后，原版也不再执行部署后的费用还原。
+				Check(Close(battle.Unit(2).MyDefinition.MyStats.MyDeploymentCost, permanent ? price : 10));
+				Check(Close(battle.Unit(2).MyWildmnCostReduction, permanent ? (elite ? 5 : 1) : 0));
+			}
+	}
+
+	void WildmnSharedCap()
+	{
+		const OperatorKitDefinition normal = WildmnKit{}, elite = WildmnKit{.MyCostCap = 5, .MyEveryDeploy = true};
+		for (const bool eliteFirst : {false, true})
+		{
+			auto input = Input(normal); auto& allies = input.MyPlayers[0].MyUnits;
+			allies[0].MyDeferred = allies[1].MyDeferred = true;
+			allies[1].MyDefinition.MyOperatorProfession = OperatorProfession::WARRIOR; allies[1].MyDefinition.MyStats.MyDeploymentCost = 10;
+			allies.push_back(Ally(3, {5, 10}, &elite)); allies[2].MyDeferred = true;
+			Battle battle(std::move(input)); battle.Start();
+			Check(battle.Redeploy(eliteFirst ? 3 : 1, true)); Check(battle.Redeploy(eliteFirst ? 1 : 3, true));
+			Check(Close(battle.Unit(2).MyWildmnCostReduction, eliteFirst ? 1 : 2));
+		}
+	}
+
+	void WildmnPush(RulePositionMode _mode)
+	{
+		const OperatorKitDefinition kit = WildmnKit{.MyCharge = true};
+		for (const bool behind : {false, true})
+		{
+			auto input = Input(kit, _mode); auto& definition = input.MyPlayers[0].MyUnits[0].MyDefinition;
+			definition.MySkill.MyAttack = definition.MyAttack; definition.MySkill.MyAttack->MyOperatorSkillHit = true;
+			definition.MySkill.MyAttack->MyHits = 3;
+			Battle battle(std::move(input)); battle.Start(); Check(battle.Relocate(1, {5, 12}));
+			const auto enemy = Enemy(battle, {behind ? 4.0 : 6.0, 12}); Check(battle.ActivateSkill(1));
+			const std::array<UnitId, 1> target{enemy}; Check(battle.ForceAttack(1, target));
+			Check(Close(battle.Unit(enemy).MyPosition.MyX, behind ? 3.56 : 8.14));
+			Check(Close(battle.Unit(enemy).MyPosition.MyY, 12)); Check(Close(battle.Unit(enemy).MyHealth, 9700));
+			battle.EndSkill(1); Check(battle.ForceAttack(1, target));
+			Check(Close(battle.Unit(enemy).MyPosition.MyX, behind ? 3.56 : 8.14));
+		}
+	}
+
+	void LiskamProtection()
+	{
+		const OperatorKitDefinition kit = LiskamKit{.MySp = 1, .MyDefense = true};
+		auto input = Input(kit); auto& allies = input.MyPlayers[0].MyUnits;
+		allies[0].MyDefinition.MySkill.MySpType = SpType::HURT;
+		allies[0].MyDefinition.MySkill.MySpCost = 10; allies[0].MyDefinition.MySkill.MyInitialSp = 10;
+		allies[1].MyDefinition.MySkill.MySpCost = 100; allies[1].MyDefinition.MySkill.MyInitialSp = 0;
+		Battle battle(std::move(input)); battle.Start(); Check(battle.ActivateSkill(1));
+		const auto blocked = [&]() { return std::ranges::any_of(battle.Unit(1).MyBuffs, [](const auto& _buff) { return _buff.MyDefinition.MyKey == "liskam:block"; }); };
+		Check(blocked()); const auto random = battle.RandomState();
+		(void)battle.DealDamage(0, 1, 0, DamageType::TRUE_DAMAGE); (void)battle.LoseHealth(0, 1, 1);
+		(void)battle.DealElement(0, 1, {.MyElement = Element::NEURAL, .MyAmount = 100});
+		Check(blocked()); Check(battle.RandomState() == random); Check(Close(battle.SpTotal(2), 0));
+		Check(Close(battle.DealDamage(0, 1, 100, DamageType::TRUE_DAMAGE), 0)); Check(!blocked());
+		Check(Close(battle.Unit(1).MyHealth, 999)); Check(battle.RandomState() == random);
+		Check(Close(battle.DealDamage(0, 1, 10, DamageType::TRUE_DAMAGE), 10));
+		Check(Close(battle.SpTotal(1), 0)); Check(Close(battle.SpTotal(2), 1));
+		(void)battle.DealDamage(0, 1, {.MyAmount = 10, .MyType = DamageType::TRUE_DAMAGE, .MyNoSp = true});
+		Check(Close(battle.SpTotal(2), 1));
+		for (const auto type : {DamageType::PHYSICAL, DamageType::ARTS, DamageType::ELEMENTAL})
+		{
+			battle.EndSkill(1); battle.SetSpTotal(1, 10); Check(battle.ActivateSkill(1));
+			Check(blocked()); Check(Close(battle.DealDamage(0, 1, 100, type), 0)); Check(!blocked());
+		}
+		battle.EndSkill(1); Check(!battle.Unit(1).MyStatuses.Has(CombatStatus::STUN));
+		(void)battle.DealDamage(0, 1, 10, DamageType::TRUE_DAMAGE);
+		Check(Close(battle.SpTotal(1), 2)); Check(Close(battle.SpTotal(2), 2));
+		battle.SetSpTotal(2, 100); Check(battle.ActivateSkill(2)); const auto beforeBusy = battle.RandomState();
+		(void)battle.DealDamage(0, 1, 10, DamageType::TRUE_DAMAGE);
+		Check(battle.RandomState() != beforeBusy); Check(Close(battle.SpTotal(2), 0));
+	}
+
+	void LiskamPosition(RulePositionMode _mode)
+	{
+		const OperatorKitDefinition kit = LiskamKit{.MySp = 1};
+		auto input = Input(kit, _mode); auto other = Ally(3, {6, 12});
+		other.MyDefinition.MySkill.MySpCost = 100; other.MyDefinition.MySkill.MyInitialSp = 0;
+		input.MyPlayers[0].MyUnits[1].MyDefinition.MySkill = other.MyDefinition.MySkill;
+		input.MyPlayers.push_back({.MyPlayerId = "q", .MyUnits = {std::move(other)}});
+		Battle battle(std::move(input)); battle.Start(); Check(battle.Relocate(1, {5, 12})); Check(battle.Relocate(2, {10, 10}));
+		(void)battle.DealDamage(0, 1, 1, DamageType::TRUE_DAMAGE);
+		const UnitId chosen = _mode == RulePositionMode::INITIAL ? 2 : 3;
+		Check(Close(battle.SpTotal(chosen), 1)); Check(Close(battle.SpTotal(chosen == 2 ? 3 : 2), 0));
+		(void)battle.ApplyStatus(chosen, CombatStatus::ISOLATED, 10); const auto random = battle.RandomState();
+		(void)battle.DealDamage(0, 1, 1, DamageType::TRUE_DAMAGE); Check(battle.RandomState() == random);
+	}
+
+	void LiskamHitProbability()
+	{
+		for (const double probability : {0.0, 1.0})
+		{
+			const OperatorKitDefinition kit = LiskamKit{.MyProbability = probability, .MyStun = 2, .MyArc = true};
+			auto input = Input(kit); auto& definition = input.MyPlayers[0].MyUnits[0].MyDefinition;
+			definition.MySkill.MyAttack = definition.MyAttack; definition.MySkill.MyAttack->MyOperatorSkillHit = true;
+			Battle battle(std::move(input)); battle.Start(); Check(battle.ActivateSkill(1));
+			battle.AddShield(2, {.MyHits = 1}); const std::array<UnitId, 1> target{2};
+			Check(battle.ForceAttack(1, target)); Check(Close(battle.Unit(2).MyHealth, 1000));
+			Check(battle.Unit(2).MyStatuses.Has(CombatStatus::STUN) == std::isgreater(probability, 0));
+			Random expected(1); (void)expected.Next(); Check(battle.RandomState() == expected.State());
+			// 技能命中对存活友方也抽签，零概率同样消耗随机数；普通攻击不携带该回调。
+			battle.EndSkill(1); (void)battle.RemoveStatus(2, CombatStatus::STUN);
+			Check(battle.ForceAttack(1, target)); Check(!battle.Unit(2).MyStatuses.Has(CombatStatus::STUN));
+			Check(battle.RandomState() == expected.State());
+		}
+	}
+
+	void OperatorSkillDelayedHit()
+	{
+		const std::array<OperatorKitDefinition, 2> kits{WildmnKit{.MyCharge = true}, LiskamKit{.MyProbability = 1, .MyStun = 2, .MySelfStun = 5, .MyArc = true}};
+		for (const auto& kit : kits)
+			for (const bool permanent : {false, true})
+			{
+				auto input = Input(kit); auto& definition = input.MyPlayers[0].MyUnits[0].MyDefinition;
+				definition.MyAttack.MyRanged = true; definition.MyAttack.MyProjectileSpeed = 3;
+				definition.MySkill.MyAttack = definition.MyAttack; definition.MySkill.MyAttack->MyOperatorSkillHit = true;
+				definition.MySkill.MyAttack->MyHits = 3;
+				Battle battle(std::move(input)); battle.Start(); const auto enemy = Enemy(battle, {8, 9});
+				Check(battle.ActivateSkill(1)); const std::array<UnitId, 1> target{enemy}; Check(battle.ForceAttack(1, target));
+				if (permanent) battle.Retreat(1, true); else battle.EndSkill(1);
+				if (std::holds_alternative<LiskamKit>(kit)) Check(battle.Unit(1).MyStatuses.Has(CombatStatus::STUN) == !permanent);
+				battle.Advance(32); Check(Close(battle.Unit(enemy).MyHealth, 9700));
+				if (std::holds_alternative<WildmnKit>(kit)) Check(Close(battle.Unit(enemy).MyPosition.MyX, 10.14));
+				else
+				{
+					Check(battle.Unit(enemy).MyStatuses.Has(CombatStatus::STUN)); Random expected(1); (void)expected.Next();
+					Check(battle.RandomState() == expected.State());
+				}
+			}
+	}
 }
 
 int main()
@@ -404,10 +574,12 @@ int main()
 		{
 			EstellHealing(mode); PodegoHealingAndSp(mode); PodegoZoneLifetime(mode); TinmanLifetime(mode);
 			IndigoMazePosition(mode); IndigoNormalAttackPosition(mode);
+			WildmnPush(mode); LiskamPosition(mode);
 		}
-		PodegoAuraOwnership(); PithstElements(); TinmanRegeneration(); TinmanWither(); TinmanWeakZone();
+		OperatorHookCleanup(); PodegoAuraOwnership(); PithstElements(); TinmanRegeneration(); TinmanWither(); TinmanWeakZone();
 		IndigoEnergyAndRetarget(); IndigoBlockedTarget(); IndigoDelayedHit();
 		UtageBreach(); UtageProtectionAndSpeed(); UtageRest();
+		WildmnDiscounts(); WildmnSharedCap(); LiskamProtection(); LiskamHitProbability(); OperatorSkillDelayedHit();
 		std::cout << "operator kits lifecycle and position rules passed\n";
 	}
 	catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

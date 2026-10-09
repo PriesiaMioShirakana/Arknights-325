@@ -50,6 +50,18 @@ namespace Stronghold
 		}
 	}
 
+	namespace
+	{
+		double StatusResistance(const CombatUnit& _unit)
+		{
+			const auto index = static_cast<std::size_t>(CombatStatus::RESIST);
+			double value = std::isgreater(_unit.MyStatuses.MyRemaining[index], 0) ? _unit.MyStatuses.MyValues[index] : 0;
+			for (const auto& buff : _unit.MyBuffs) if (buff.MyDefinition.MyStatus == CombatStatus::RESIST)
+				value = std::max(value, buff.MyDefinition.MyStrength ? buff.MyDefinition.MyStrength->MyValue : 0.5);
+			return std::clamp(value, 0.0, 0.95);
+		}
+	}
+
 	bool Battle::ApplyStatus(UnitId _target, CombatStatus _status, double _seconds, UnitId _source, bool _force)
 	{
 		if (!std::isfinite(_seconds) || std::isless(_seconds, 0) || std::isgreater(_seconds, 3600))
@@ -79,7 +91,7 @@ namespace Stronghold
 		// 切换动画的免控是职业规则，即使强制施加也拒绝；无需分配自定义监听器。
 		if (target.MyProfession.MyDollSwitching && (_status == CombatStatus::STUN ||
 			_status == CombatStatus::FREEZE || _status == CombatStatus::SLEEP)) return false;
-		if (!_MyContentInstances.empty() || _MyEquipmentStatusEffects)
+		if (!_MyContentInstances.empty() || _MyEquipmentStatusEffects || !_MySvash2s.empty() || !_MyBlkkgts.empty())
 		{
 			ContentEvent event{.MyKind = ContentEventKind::BEFORE_STATUS, .MySource = application.MySource,
 				.MyTarget = _target, .MyStatus = _status, .MyApplication = application};
@@ -92,8 +104,7 @@ namespace Stronghold
 				(application.MyPoint && (!std::isfinite(application.MyPoint->MyX) || !std::isfinite(application.MyPoint->MyY)))) return false;
 			if (application.MySource) (void)Index(application.MySource);
 		}
-		if (Resisted(_status) && !application.MyResistApplied && statuses.Has(CombatStatus::RESIST))
-			duration *= 1 - std::clamp(statuses.MyValues[StatusIndex(CombatStatus::RESIST)], 0.0, 0.95);
+		if (Resisted(_status) && !application.MyResistApplied) duration *= 1 - StatusResistance(target);
 		if ((_status == CombatStatus::LEVITATE || _status == CombatStatus::GROUNDBIND) && std::isgreater(target.MyStats.MyMass, 3)) duration /= 2;
 		if (_status == CombatStatus::COLD && std::isgreater(statuses.MyRemaining[index], 0) && !target.MyDefinition.MyImmunities[StatusIndex(CombatStatus::FREEZE)])
 		{
@@ -173,11 +184,16 @@ namespace Stronghold
 		const auto index = StatusIndex(_status);
 		auto& target = _MyUnits[Index(_target)];
 		auto& remaining = target.MyStatuses.MyRemaining[index];
-		if (!_MyStarted || Finished() || !target.MyAlive || !std::isgreater(remaining, 0)) return false;
+		if (!_MyStarted || Finished() || !target.MyAlive) return false;
+		auto& scratch = AcquireAttackScratch();
+		struct StatusScratchGuard { std::size_t& MyDepth; ~StatusScratchGuard() { --MyDepth; } } guard{.MyDepth = _MyAttackDepth};
+		for (const auto& buff : target.MyBuffs) if (buff.MyDefinition.MyStatus == _status) scratch.MyBuffIds.push_back(buff.MyId);
+		if (!std::isgreater(remaining, 0) && scratch.MyBuffIds.empty()) return false;
 		remaining = 0;
 		if (_status == CombatStatus::FEAR) target.MyStatuses.MyFear.reset();
 		target.MyStatuses.MyValues[index] = 0;
 		target.MyStatuses.MyTails[index].reset();
+		for (const auto id : scratch.MyBuffIds) (void)RemoveBuff(_target, id);
 		Recalculate(target);
 		Emit(BattleEventKind::STATUS_REMOVED, 0, _target, 0, _status);
 		return true;
@@ -212,7 +228,7 @@ namespace Stronghold
 				}
 				else statuses.MyValues[i] = 0;
 			}
-			if (std::isgreater(statuses.MyRemaining[StatusIndex(CombatStatus::RESIST)], 0))
+			if (std::isgreater(StatusResistance(unit), 0))
 			{
 				statuses.MyResistAccumulator += BattleClock::StepSeconds;
 				if (std::isgreaterequal(statuses.MyResistAccumulator, 5 - 1e-9))

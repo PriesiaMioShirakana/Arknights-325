@@ -225,6 +225,8 @@ namespace Stronghold
 		auto& skill = unit.MySkill;
 		if (!_MyStarted || Finished() || !unit.MyAlive || definition.MyKind == SkillKind::NONE || definition.MyKind == SkillKind::PASSIVE ||
 			(!_free && skill.MyCharges == 0) || (skill.MyActive && IsTimedSkill(definition.MyKind))) return false;
+		if (const auto* kit = unit.MyDefinition.MyOperatorKit ? std::get_if<PapyrsKit>(unit.MyDefinition.MyOperatorKit) : nullptr;
+			kit && kit->MyLockSkill && !PapyrsTarget(_unit)) return false;
 		if (!_free)
 		{
 			const bool full = skill.MyCharges == definition.MyMaxCharges;
@@ -245,8 +247,11 @@ namespace Stronghold
 			skill.MyAmmoMax = skill.MyAmmoLeft;
 		}
 		ApplySkillModifiers(unit);
+		const auto* texas = definition.MyKind != SkillKind::NONE && unit.MyDefinition.MyOperatorKit ? std::get_if<Texas2Kit>(unit.MyDefinition.MyOperatorKit) : nullptr;
+		if (texas) Texas2Start(_unit, *texas, _reason);
 		ContentEvent event{.MyKind = ContentEventKind::SKILL_START, .MyUnit = _unit, .MySkillReason = _reason};
 		NotifyContent(event);
+		if (texas) Texas2FinishStart(_unit);
 		if (skill.MyActive) skill.MyAmmoMax = std::max(skill.MyAmmoMax, skill.MyAmmoLeft);
 		if (!IsTimedSkill(definition.MyKind) && !skill.MyPending) EndSkill(_unit, SkillReason::INSTANT);
 		return true;
@@ -408,8 +413,12 @@ namespace Stronghold
 		const auto& definition = _unit.MyDefinition.MySkill;
 		auto& skill = _unit.MySkill;
 		const bool skillAttack = skill.MyActive && (IsTimedSkill(definition.MyKind) || (_usedOverride && skill.MyPending));
-		ContentEvent event{.MyKind = ContentEventKind::ATTACK, .MyUnit = _unit.MyId, .MySource = _unit.MyId, .MyNoAmmo = _noAmmo, .MyTargetCount = _targets.size(), .MyTargets = _targets};
+		ContentEvent event{.MyKind = ContentEventKind::ATTACK, .MyUnit = _unit.MyId, .MySource = _unit.MyId, .MyNoAmmo = _noAmmo, .MyTargetCount = _targets.size(), .MySkillAttack = skillAttack, .MyTargets = _targets};
 		NotifyContent(event);
+		if (Finished() || !_unit.MyAlive) return;
+		if (const auto* mizuki = _unit.MyDefinition.MyOperatorKit ? std::get_if<MizukiKit>(_unit.MyDefinition.MyOperatorKit) : nullptr;
+			mizuki && mizuki->MySkill == MizukiSkillKind::MIRROR && skill.MyActive && std::ranges::count_if(_targets, [&](UnitId _id) { return Unit(_id).MySide == UnitSide::ENEMY; }) < 3)
+			(void)LoseHealth(0, _unit.MyId, _unit.MyStats.MyMaxHealth * mizuki->MySelfLoss);
 		if (Finished() || !_unit.MyAlive) return;
 		if (skill.MyActive && definition.MyKind == SkillKind::AMMO)
 		{

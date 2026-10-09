@@ -75,6 +75,248 @@ namespace Stronghold
 			if (Finished()) break;
 			switch (action.MyKind)
 			{
+			case ScheduledKind::OPERATOR_AURA:
+			case ScheduledKind::OPERATOR_GROUND_ASPD:
+				if (action.MyKind == ScheduledKind::OPERATOR_AURA) RefreshOperatorAura(static_cast<std::size_t>(action.MyHandle));
+				else RefreshGroundAttackSpeed(static_cast<std::size_t>(action.MyHandle));
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::WOLF_GROW:
+			{
+				const auto& unit = Unit(action.MySource);
+				if (!unit.MyAlive || unit.MyDeploySequence != action.MyVersion || !unit.MyDefinition.MyTokenKit || !unit.MyDefinition.MyTokenKit->MyWolf) break;
+				(void)AddWolfShadow(action.MySource, unit.MyDefinition.MyTokenKit->MyWolf->MyMaxShadows);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished()) Schedule(action);
+				break;
+			}
+			case ScheduledKind::WOLF_RETURN:
+				if (!Unit(action.MySource).MyWolfTactical || Unit(action.MySource).MyWolfFormSequence != action.MyVersion) break;
+				if (!ReturnWolf(action.MySource) && !Finished()) { action.MyAt = Time() + 0.25; Schedule(action); }
+				break;
+			case ScheduledKind::VIGIL_MARK:
+				VigilMark(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::LISA_AURA:
+			case ScheduledKind::DEMKNI_SUIT:
+				if (action.MyKind == ScheduledKind::LISA_AURA) LisaAura(action.MySource); else DemkniSuit(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::REED2_BURST:
+				Reed2Burst(action.MySource, action.MyPoint);
+				break;
+			case ScheduledKind::ROSMON_STABLE:
+				RosmonStable(action.MySource);
+				break;
+			case ScheduledKind::CELLO_PULSE:
+			case ScheduledKind::REED2_MODULE:
+				if (action.MyKind == ScheduledKind::CELLO_PULSE) CelloPulse(action.MySource, static_cast<unsigned>(action.MyHandle)); else Reed2Module(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased) Schedule(action);
+				break;
+			case ScheduledKind::HALO2_PULSE:
+			case ScheduledKind::AGOAT2_PULSE:
+				if (action.MyKind == ScheduledKind::HALO2_PULSE) Halo2Pulse(action.MySource); else Agoat2Pulse(action.MySource, action.MyHandle != 0);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased) Schedule(action);
+				break;
+			case ScheduledKind::SIEGE2_PULSE:
+				Siege2Pulse(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased) Schedule(action);
+				break;
+			case ScheduledKind::SBELL2_MODULE:
+				Sbell2Module(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased) Schedule(action);
+				break;
+			case ScheduledKind::YU_PULSE:
+				YuPulse(action.MySource, static_cast<unsigned>(action.MyHandle));
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased) Schedule(action);
+				break;
+			case ScheduledKind::PASNGR_STORM:
+				if (const auto& unit = Unit(action.MySource); unit.MyAlive && !unit.MyHidden && !unit.MyOperatorHooksReleased && unit.MyDeploySequence == action.MyVersion)
+				{
+					PasngrStorm(action.MySource, action.MyPoint);
+					if (action.MyRemaining > 1 && !Finished()) { --action.MyRemaining; action.MyAt = Time() + action.MyInterval; Schedule(action); }
+				}
+				break;
+			case ScheduledKind::QIUBAI_BURST:
+				if (const auto& unit = Unit(action.MySource); unit.MyAlive && !unit.MyOperatorHooksReleased && unit.MyDeploySequence == action.MyVersion) QiubaiBurst(unit.MyId, action.MyTarget);
+				break;
+			case ScheduledKind::LEMUEN_WANTED:
+				LemuenWanted();
+				if (!Finished()) { action.MyAt = Time() + action.MyInterval; Schedule(action); }
+				break;
+			case ScheduledKind::LEMUEN_EXTRADITION:
+				if (const auto& unit = Unit(action.MySource); unit.MyAlive && !unit.MyHidden && !unit.MyOperatorHooksReleased && unit.MyDeploySequence == action.MyVersion)
+				{
+					const auto attack = std::get<LemuenKit>(*unit.MyDefinition.MyOperatorKit).MyExtraditionAttack;
+					if (std::islessgreater(attack, 0)) (void)AddBuff(unit.MyId, {.MyKey = "lemuen:extradition", .MyModifiers = std::vector<AttributeChange>{{.MyAttribute = Attribute::ATTACK_PERCENT, .MyValue = attack}}});
+				}
+				break;
+			case ScheduledKind::LEMUEN_FIRE:
+				LemuenFire(static_cast<std::size_t>(action.MyHandle), action.MyRemaining);
+				break;
+			case ScheduledKind::LEMUEN_BLAST:
+				if (!Unit(action.MySource).MyOperatorHooksReleased) LemuenBlast(action.MySource, action.MyPoint, action.MyAmount);
+				break;
+			case ScheduledKind::THORN2_VISION:
+			case ScheduledKind::THORN2_ZONES:
+				if (action.MyKind == ScheduledKind::THORN2_VISION) Thorn2Vision(action.MySource); else Thorn2Zones(action.MySource);
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased)
+				{ action.MyAt = Time() + action.MyInterval; Schedule(action); }
+				break;
+			case ScheduledKind::SNTLLA_TALENT:
+				SntllaTalent(action.MySource);
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased)
+				{ action.MyAt = Time() + action.MyInterval; Schedule(action); }
+				break;
+			case ScheduledKind::SNTLLA_IMPACT:
+				if (!Unit(action.MySource).MyOperatorHooksReleased) SntllaImpact(action.MySource, action.MyPoint);
+				break;
+			case ScheduledKind::SVASH2_SNOW:
+				Svash2Snow(action.MySource);
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased)
+				{ action.MyAt = Time() + action.MyInterval; Schedule(action); }
+				break;
+			case ScheduledKind::GHOST2_SLOW:
+			case ScheduledKind::GHOST2_DAMAGE:
+				Ghost2Pulse(action.MySource, action.MyKind == ScheduledKind::GHOST2_DAMAGE);
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased)
+				{ action.MyAt = Time() + action.MyInterval; Schedule(action); }
+				break;
+			case ScheduledKind::HORN_FLARES:
+				HornFlares(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyOperatorHooksReleased) Schedule(action);
+				break;
+			case ScheduledKind::SURTR_RETREAT:
+				if (Unit(action.MySource).MyAlive && Unit(action.MySource).MyDeploySequence == action.MyVersion) Retreat(action.MySource, false, RemovalReason::RETREAT, true);
+				break;
+			case ScheduledKind::BLAZE_GROUND:
+				Blaze2Ground(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::TITI_DREAM:
+			case ScheduledKind::TITI_VIGOR:
+				TitiPulse(action.MySource, action.MyKind == ScheduledKind::TITI_DREAM);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::EXCU2_ATTACK:
+				Excu2ExtraAttack(action.MySource, action.MyVersion);
+				break;
+			case ScheduledKind::CETSYR_MOTES:
+				CetsyrMotes(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::OPERATOR_MODULE:
+				OperatorModuleTick(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::TEXAS2_RAIN:
+				if (!Unit(action.MySource).MyAlive || !Unit(action.MySource).MySkill.MyActive || Unit(action.MySource).MyTexas2RainVersion != action.MyVersion) break;
+				Texas2Rain(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished()) Schedule(action);
+				break;
+			case ScheduledKind::MUDROK_LAYERS:
+			{
+				const auto& unit = Unit(action.MySource);
+				if (unit.MyDeploySequence != action.MyVersion || unit.MyRemoved) break;
+				const auto& kit = std::get<MudrokKit>(*unit.MyDefinition.MyOperatorKit);
+				if (unit.MyAlive && unit.MyMudrokLayers < kit.MyMaxLayers) MudrokLayers(unit.MyId, std::min(kit.MyMaxLayers, unit.MyMudrokLayers + kit.MyLayerGain));
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished()) Schedule(action);
+				break;
+			}
+			case ScheduledKind::GNOSIS_AURA:
+			case ScheduledKind::GNOSIS_RESIST:
+			case ScheduledKind::LIONHD_PRESENCE:
+				if (action.MyKind == ScheduledKind::LIONHD_PRESENCE) LionhdPresence(action.MySource);
+				else GnosisAura(action.MySource, action.MyKind == ScheduledKind::GNOSIS_RESIST);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::CATHY_FORGE:
+				if (Unit(action.MySource).MyDeploySequence != action.MyVersion) break;
+				RefreshOperatorAura(action.MyHandle);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::CAT_SHIELD:
+				CatShieldTick(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::MIZUKI_PRESENCE:
+			case ScheduledKind::AROMA_LANDING:
+				if (action.MyKind == ScheduledKind::MIZUKI_PRESENCE) MizukiPresence(action.MySource); else AromaLanding(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::INES_SENTRY:
+				InesSentry(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::INES_FIRST_RETREAT:
+				if (Unit(action.MySource).MyAlive)
+				{ Retreat(action.MySource); _MyUnits[Index(action.MySource)].MyRespawnAt = Time(); }
+				break;
+			case ScheduledKind::RMIXER_SHIELD:
+				RmixerShield(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::ARCHET_TACTICS:
+				ArchetTactics(action.MySource);
+				action.MyAt += action.MyInterval;
+				if (std::islessequal(action.MyAt, now)) action.MyAt = Time() + action.MyInterval;
+				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
+				break;
+			case ScheduledKind::ANGEL_BLESS:
+				AngelBless(action.MySource);
+				break;
+			case ScheduledKind::DOCKED_SUMMON_RETRY:
+				_MyUnits[Index(action.MyTarget)].MySummonRetry = false;
+				(void)DeployDockedSummon(action.MyTarget);
+				break;
+			case ScheduledKind::TOKEN_KIT_EXPIRE:
+				if (Unit(action.MyTarget).MyAlive && Unit(action.MyTarget).MyDeploySequence == action.MyVersion)
+					Retreat(action.MyTarget, true, RemovalReason::EXPIRED);
+				break;
 			case ScheduledKind::TINMAN_ZONE:
 				TinmanZonePulse(action.MySource, action.MyPoint, action.MyAmount, action.MyHandle, action.MyVersion % 4 == 0);
 				++action.MyVersion;
@@ -85,12 +327,6 @@ namespace Stronghold
 					if (!Finished()) Schedule(action);
 				}
 				else --_MyUnits[Index(action.MySource)].MyTinmanZones;
-				break;
-			case ScheduledKind::PODEGO_AURA:
-				PodegoAura(action.MySource);
-				action.MyAt += action.MyInterval;
-				if (action.MyAt <= now) action.MyAt = Time() + action.MyInterval;
-				if (!Finished() && !Unit(action.MySource).MyRemoved) Schedule(action);
 				break;
 			case ScheduledKind::PODEGO_ZONE:
 				PodegoZonePulse(action.MySource, action.MyPoint, action.MyAmount);
@@ -187,8 +423,16 @@ namespace Stronghold
 				if (crate.MyAlive && enemy.MyAlive && enemy.MyBlockedBy == crate.MyId) Kill(crate, enemy.MyId);
 				break;
 			}
+			case ScheduledKind::DUSK_EXPIRE:
+				if (Unit(action.MyTarget).MyAlive && Unit(action.MyTarget).MyDeploySequence == action.MyVersion)
+				{
+					const auto until = Unit(action.MyTarget).MyDuskUntil;
+					if (std::isgreater(until - Time(), 1e-6)) { action.MyAt = until; Schedule(action); }
+					else Retreat(action.MyTarget, true, RemovalReason::EXPIRED);
+				}
+				break;
 			case ScheduledKind::TOKEN_EXPIRE:
-				if (Unit(action.MyTarget).MyAlive) Retreat(action.MyTarget, true, RemovalReason::EXPIRED);
+				if (Unit(action.MyTarget).MyAlive && Unit(action.MyTarget).MyDeploySequence == action.MyVersion) Retreat(action.MyTarget, true, RemovalReason::EXPIRED);
 				break;
 			case ScheduledKind::COLD_WIND:
 			{

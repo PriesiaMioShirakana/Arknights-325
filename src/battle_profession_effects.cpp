@@ -68,7 +68,7 @@ namespace Stronghold
 			}
 			else if (_event.MyElement) return;
 		}
-		if (std::isgreater(count, 0)) (void)Heal(unit.MyId, unit.MyId, definition.MySelfHeal * count,
+		if (std::isgreater(count, 0)) (void)Heal(unit.MyId, unit.MyId, unit.MyReaperHeal.value_or(definition.MySelfHeal) * count,
 			HealOptions{.MySelf = true, .MyIgnoreHealFree = true});
 	}
 
@@ -122,6 +122,11 @@ namespace Stronghold
 		case ProfessionTrait::MERCHANT:
 		{
 			if (_unit.MyOwner == NoPlayer) break;
+			if (const auto* kit = _unit.MyDefinition.MyOperatorKit ? std::get_if<Swire2Kit>(_unit.MyDefinition.MyOperatorKit) : nullptr)
+			{
+				Swire2Pay(_unit.MyId, *kit);
+				break;
+			}
 			ContentEvent payment{.MyKind = ContentEventKind::MERCHANT_PAY, .MyUnit = _unit.MyId, .MyAmount = definition.MyMerchantCost};
 			NotifyContent(payment);
 			if (!_unit.MyAlive || payment.MyCancel || Finished()) break;
@@ -142,7 +147,7 @@ namespace Stronghold
 		case ProfessionTrait::BARD:
 		{
 			if (_unit.MyHidden || _unit.MyStatuses.Has(CombatStatus::STUN)) break;
-			const auto value = _unit.MyStats.MyAttack * definition.MyAuraRatio;
+			const auto value = _unit.MyStats.MyAttack * _unit.MyBardRatio.value_or(definition.MyAuraRatio);
 			if (!std::isgreater(value, 0)) break;
 			// 回调可召唤新单位；这里固定本次选择的 ID 快照，不持有可失效的 vector 迭代器。
 			auto& scratch = AcquireAttackScratch();

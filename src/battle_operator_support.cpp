@@ -12,9 +12,13 @@ namespace Stronghold
 		};
 	}
 
-	bool Battle::OperatorCanAttack(const CombatUnit& _unit) const
+	bool Battle::OperatorCanAttack(const CombatUnit& _unit)
 	{
+		if (const auto* billro = _unit.MyDefinition.MyOperatorKit ? std::get_if<BillroKit>(_unit.MyDefinition.MyOperatorKit) : nullptr; billro && billro->MySkill == BillroSkillKind::GUARD && _unit.MySkill.MyActive && _unit.MyBillroCharged) return false;
 		const auto* rules = _unit.MyDefinition.MyOperatorKit;
+		if (const auto* aglina = rules ? std::get_if<AglinaKit>(rules) : nullptr; aglina && aglina->MySkill != AglinaSkillKind::CHARGE && !_unit.MySkill.MyActive) return false;
+		if (const auto* swire = rules ? std::get_if<Swire2Kit>(rules) : nullptr; swire && swire->MySkill == Swire2SkillKind::BOMB && Swire2ThrowDue(_unit.MyId, *swire)) return false;
+		if (rules && std::holds_alternative<GrabdsKit>(*rules) && _unit.MySkill.MyActive && std::isless(Time(), _unit.MyGrabdsQuietUntil)) return false;
 		if (rules && std::holds_alternative<IndigoKit>(*rules))
 			return std::ranges::any_of(_MyEnemyIds, [&](UnitId id)
 			{
@@ -31,16 +35,134 @@ namespace Stronghold
 		});
 	}
 
-	void Battle::OperatorAfterHit(UnitId _source, UnitId _target)
+	void Battle::OperatorAfterHit(UnitId _source, UnitId _target, const AttackProfile& _profile, WorldPoint _point, double _dealt)
 	{
 		const auto& source = Unit(_source); const auto* rules = source.MyDefinition.MyOperatorKit;
-		if (!_target || !rules || !Unit(_target).MyAlive || Unit(_target).MySide != UnitSide::ENEMY) return;
+		if (!rules) return;
+		if (const auto* lemuen = std::get_if<LemuenKit>(rules); lemuen && _target && Unit(_target).MyAlive && !source.MySkill.MyActive && std::isgreater(lemuen->MySurvivorSp, 0)) (void)GainSp(_source, lemuen->MySurvivorSp, SpReason::TRAIT);
+		if (const auto* gvial = std::get_if<GvialKit>(rules); gvial && gvial->MySkill == GvialSkillKind::HEAL && source.MySkill.MyActive && source.MyAlive && std::isgreater(_dealt, 0))
+			(void)Heal(_source, _source, _dealt * gvial->MyLifeSteal, {.MySelf = true});
+		if (const auto* ines = std::get_if<InesKit>(rules); ines && ines->MySkill == InesSkillKind::STEALTH && source.MySkill.MyActive) InesHit(_source, _target, *ines);
+		if (const auto* qiubai = std::get_if<QiubaiKit>(rules); qiubai && _target && Unit(_target).MyAlive) QiubaiHit(_source, _target, *qiubai);
+		if (const auto* f12yin = std::get_if<F12yinKit>(rules); f12yin && source.MyF12yinCritical && _target && Unit(_target).MyAlive && std::islessgreater(f12yin->MyWeaken, 0))
+			(void)AddBuff(_target, {.MyKey = "f12yin:punch", .MyDuration = f12yin->MyWeakenDuration,
+				.MyModifiers = std::vector<AttributeChange>{{.MyAttribute = Attribute::ATTACK_PERCENT, .MyValue = f12yin->MyWeaken}}, .MyStatus = CombatStatus::WEAKEN});
+		if (_profile.MyOperatorSkillHit)
+		{
+			if (const auto* cello = std::get_if<CelloKit>(rules); cello && _target && Unit(_target).MyAlive && std::isgreater(Unit(_target).MyHealth, 0) && std::isgreater(cello->MySkillElement, 0))
+				(void)DealElement(_source, _target, {.MyElement = Element::APOPTOSIS, .MyAmount = source.MyStats.MyAttack * cello->MySkillElement, .MyTags = static_cast<DamageTags>(DamageTag::SKILL)});
+			if (const auto* halo = std::get_if<Halo2Kit>(rules); halo && _target) Halo2Hit(_source, _target, *halo);
+			if (const auto* siege = std::get_if<Siege2Kit>(rules); siege && siege->MySkill == Siege2SkillKind::REFORGE) Siege2Burst(_source, *siege);
+			if (const auto* pepe = std::get_if<PepeKit>(rules); pepe && _target && Unit(_target).MyAlive && std::isgreater(pepe->MyMainStun, 0)) (void)ApplyStatus(_target, CombatStatus::STUN, pepe->MyMainStun, _source);
+			if (const auto* qiubai = std::get_if<QiubaiKit>(rules); qiubai && _target && Unit(_target).MyAlive)
+			{
+				(void)ApplyStatus(_target, CombatStatus::BIND, qiubai->MySkillBind, _source);
+				Schedule({.MyAt = Time() + qiubai->MySkillBind, .MyKind = ScheduledKind::QIUBAI_BURST, .MySource = _source, .MyTarget = _target, .MyVersion = source.MyDeploySequence});
+			}
+			if (const auto* nymph = std::get_if<NymphKit>(rules); nymph && _target && Unit(_target).MyAlive) (void)ApplyStatus(_target, CombatStatus::FEAR, nymph->MyFear, _source);
+			if (const auto* horn = std::get_if<HornKit>(rules); horn && horn->MySkill == HornSkillKind::FLARE)
+			{
+				auto& unit = _MyUnits[Index(_source)];
+				if (unit.MyHornFlare) { unit.MyHornFlare = false; unit.MyFlares.push_back({.MyPoint = _point, .MyUntil = Time() + horn->MyFlareDuration}); }
+				return;
+			}
+			if (const auto* surtr = std::get_if<SurtrKit>(rules); surtr && surtr->MySkill == SurtrSkillKind::BLADE)
+			{
+				if (_target && Unit(_target).MySide == UnitSide::ENEMY && !Unit(_target).MyAlive) (void)GainSp(_source, SpCost(_source), SpReason::SKILL);
+				return;
+			}
+			if (const auto* titi = std::get_if<TitiKit>(rules))
+			{
+				if (_target && Unit(_target).MyAlive && !Unit(_target).MyStatuses.Has(CombatStatus::SLEEP) &&
+					(titi->MySkill != TitiSkillKind::ERODE || std::isless(_MyRandom.Next(), titi->MySleepChance))) (void)ApplyStatus(_target, CombatStatus::SLEEP, titi->MySleep, _source);
+				return;
+			}
+			if (const auto* ines = std::get_if<InesKit>(rules))
+			{
+				InesHit(_source, _target, *ines);
+				return;
+			}
+			if (const auto* rmixer = std::get_if<RmixerKit>(rules); rmixer && rmixer->MySkill == RmixerSkillKind::RELOAD)
+			{
+				ReloadNation(_source, "laterano", rmixer->MyReload, 1.5);
+				return;
+			}
+			if (const auto* vulpis = std::get_if<VulpisKit>(rules); vulpis && vulpis->MySkill == VulpisSkillKind::PUNISH)
+			{
+				VulpisPunish(_source, _target, *vulpis);
+				return;
+			}
+			if (const auto* archet = std::get_if<ArchetKit>(rules); archet && archet->MySkill == ArchetSkillKind::SCATTER)
+			{
+				ArchetScatter(_source, _target, _point, *archet);
+				return;
+			}
+			if (const auto* blemsh = std::get_if<BlemshKit>(rules))
+			{
+				if (blemsh->MySkill == BlemshSkillKind::HEAL) BlemshHeal(_source, *blemsh, false);
+				else if (_target && Unit(_target).MyAlive && std::isgreater(blemsh->MyAdditionScale, 0))
+					(void)DealDamage(_source, _target, {.MyAmount = source.MyStats.MyAttack * blemsh->MyAdditionScale, .MyType = DamageType::ARTS,
+						.MyTags = static_cast<DamageTags>(DamageTag::SKILL), .MyIsSkill = true});
+				return;
+			}
+		}
+		if (!_target || !Unit(_target).MyAlive) return;
 		if (const auto* kit = std::get_if<IndigoKit>(rules))
 		{
+			if (Unit(_target).MySide != UnitSide::ENEMY) return;
 			const auto probability = kit->MyProbability * (source.MySkill.MyActive ? kit->MySkillProbabilityScale : 1);
 			// 原 rng.chance 即使概率为 1 也消耗随机数；整次命中（含蓄能）只判断一次。
 			if (probability > 0 && _MyRandom.Next() < std::min(1.0, probability))
 				(void)ApplyStatus(_target, CombatStatus::BIND, kit->MyBindDuration, _source);
+		}
+		else if (const auto* grabds = std::get_if<GrabdsKit>(rules); grabds && Unit(_target).MySide == UnitSide::ENEMY)
+		{
+			const bool beast = std::ranges::contains(Unit(_target).MyDefinition.MyEnemyTags, "infection");
+			(void)ApplyStatus(_target, CombatStatus::SLUGGISH, grabds->MySluggish + (beast ? grabds->MyBeastSluggish : 0), _source);
+		}
+		else if (const auto* whitew = std::get_if<WhitewKit>(rules); whitew && std::isgreater(whitew->MyAdditionScale, 0) && Unit(_target).MySide == UnitSide::ENEMY)
+			OperatorAddition(_source, _target, whitew->MyAdditionScale, DamageTag::MODULE | DamageTag::ADDITION);
+		else if (const auto* ayer = std::get_if<AyerKit>(rules))
+			OperatorAddition(_source, _target, ayer->MyAdditionScale, static_cast<DamageTags>(DamageTag::MODULE), false);
+		else if (_profile.MyOperatorSkillHit)
+		{
+			if (const auto* horn = std::get_if<HornKit>(rules); horn && horn->MySkill == HornSkillKind::FLARE)
+			{
+				auto& unit = _MyUnits[Index(_source)];
+				if (unit.MyHornFlare) { unit.MyHornFlare = false; unit.MyFlares.push_back({.MyPoint = _point, .MyUntil = Time() + horn->MyFlareDuration}); }
+				return;
+			}
+			if (const auto* surtr = std::get_if<SurtrKit>(rules); surtr && surtr->MySkill == SurtrSkillKind::BLADE)
+			{
+				if (_target && Unit(_target).MySide == UnitSide::ENEMY && !Unit(_target).MyAlive) (void)GainSp(_source, SpCost(_source), SpReason::SKILL);
+				return;
+			}
+			if (const auto* titi = std::get_if<TitiKit>(rules))
+			{
+				if (_target && Unit(_target).MyAlive && !Unit(_target).MyStatuses.Has(CombatStatus::SLEEP) &&
+					(titi->MySkill != TitiSkillKind::ERODE || std::isless(_MyRandom.Next(), titi->MySleepChance))) (void)ApplyStatus(_target, CombatStatus::SLEEP, titi->MySleep, _source);
+				return;
+			}
+			if (const auto* wildmn = std::get_if<WildmnKit>(rules); wildmn && Unit(_target).MySide == UnitSide::ENEMY)
+			{
+				const auto forward = RotateOffset({.MyColumn = 1}, source.MyFacing);
+				(void)Push(_target, wildmn->MyForce, {.MyFrom = source.MyPosition,
+					.MyDirection = {.MyX = static_cast<double>(forward.MyColumn), .MyY = static_cast<double>(forward.MyRow)}});
+			}
+			else if (const auto* kjera = std::get_if<KjeraKit>(rules); kjera && std::isgreater(kjera->MyCold, 0) && std::isless(_MyRandom.Next(), kjera->MyColdProbability))
+				(void)ApplyStatus(_target, CombatStatus::COLD, kjera->MyCold, _source);
+			else if (const auto* shotst = std::get_if<ShotstKit>(rules)) ShotstShred(_source, _target, *shotst);
+			else if (const auto* gvial = std::get_if<GvialKit>(rules); gvial && gvial->MyHiddenVariant && Unit(_target).MySide == UnitSide::ENEMY && !Unit(_target).MyBlockedBy)
+				(void)PullToFront(_target, _source, gvial->MyForce);
+			else if (const auto* mudrok = std::get_if<MudrokKit>(rules); mudrok && Unit(_target).MyAlive && std::isless(_MyRandom.Next(), mudrok->MyProbability))
+				(void)ApplyStatus(_target, CombatStatus::STUN, mudrok->MyStun, _source);
+			else if (const auto* glady = std::get_if<GladyKit>(rules); glady && glady->MySkill == GladySkillKind::RIP) GladyPull(_source, _target, *glady);
+			else if (const auto* mostma = std::get_if<MostmaKit>(rules); mostma && Unit(_target).MySide == UnitSide::ENEMY)
+				(void)Push(_target, mostma->MyForce, {.MyFrom = source.MyPosition});
+			else if (const auto* mint = std::get_if<MintKit>(rules); mint && Unit(_target).MySide == UnitSide::ENEMY)
+				(void)Push(_target, mint->MyForce, {.MyFrom = source.MyPosition, .MyFromFacing = source.MyFacing, .MyInward = true});
+			else if (const auto* liskam = std::get_if<LiskamKit>(rules); liskam && std::isless(_MyRandom.Next(), liskam->MyProbability))
+				(void)ApplyStatus(_target, CombatStatus::STUN, liskam->MyStun, _source);
 		}
 	}
 
@@ -61,12 +183,17 @@ namespace Stronghold
 		}
 	}
 
-	void Battle::OperatorEnemiesInGrid(UnitId _source, std::span<const RangeOffset> _grid, std::vector<UnitId>& _targets)
+	void Battle::OperatorEnemiesInGrid(UnitId _source, std::span<const RangeOffset> _grid, std::vector<UnitId>& _targets, bool _sort)
 	{
 		const auto& source = Unit(_source); const auto point = RulePosition(source);
 		const int row = static_cast<int>(std::floor(point.MyY + 0.5)), column = static_cast<int>(std::floor(point.MyX + 0.5));
 		const AttackProfile filter{.MyCanHitFlying = true};
 		_targets.clear(); _targets.reserve(_MyEnemyIds.size());
+		if (!_sort)
+		{
+			for (const auto id : _MyEnemyIds) if (TargetableEnemy(Unit(id), filter) && OperatorInGrid(_source, id, _grid)) _targets.push_back(id);
+			return;
+		}
 		for (const auto offset : _grid)
 		{
 			const auto local = RotateOffset(offset, source.MyFacing);

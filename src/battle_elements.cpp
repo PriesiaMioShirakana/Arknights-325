@@ -40,7 +40,7 @@ namespace Stronghold
 	{
 		(void)ElementIndex(_hit.MyElement);
 		auto& target = _MyUnits[Index(_target)];
-		if (_source) (void)Index(_source);
+		if (_source) _hit.MyHitSleep |= Unit(_source).MyDefinition.MyAttack.MyHitSleep;
 		if (!std::isfinite(_hit.MyAmount) || std::isless(_hit.MyAmount, 0) || !std::isfinite(_hit.MyMultiplier) || std::isless(_hit.MyMultiplier, 0))
 			throw std::invalid_argument("invalid element hit");
 		if (!_MyStarted || Finished() || !target.MyAlive || !std::isgreater(target.MyHealth, 0) || target.MyHidden || Locked(target) ||

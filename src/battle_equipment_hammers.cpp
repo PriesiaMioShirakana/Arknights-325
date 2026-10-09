@@ -109,17 +109,26 @@ namespace Stronghold
 		}
 	}
 
+	bool Battle::HoldsUndying(UnitId _unit) const
+	{
+		const auto& unit = Unit(_unit);
+		if (unit.MyStatuses.Has(CombatStatus::UNDYING)) return true;
+		const auto found = std::ranges::find(_MyHammers, _unit, &HammerRuntime::MyUnit);
+		return found != _MyHammers.end() && found->MyHeldDeployment == unit.MyDeploySequence && std::isless(Time(), found->MyUntil);
+	}
+
 	void Battle::HammerFatal(ContentEvent& _event, bool _held)
 	{
 		if (_event.MyKind != ContentEventKind::FATAL || !_event.MyUnit || _event.MyPrevented) return;
 		const auto& unit = Unit(_event.MyUnit);
+		if (_held && HoldsUndying(unit.MyId)) { _event.MyPrevented = true; return; }
 		const auto found = std::ranges::find(_MyHammers, unit.MyId, &HammerRuntime::MyUnit);
 		if (found == _MyHammers.end()) return;
 		auto& hammer = *found;
 		if (_held)
 		{
 			// 已开始的不死窗口属于部署；后续装备借出到期也不结束该窗口。
-			if (hammer.MyHeldDeployment == unit.MyDeploySequence && Time() < hammer.MyUntil) _event.MyPrevented = true;
+			if (HoldsUndying(unit.MyId)) _event.MyPrevented = true;
 			return;
 		}
 		if (hammer.MyLockDeployment == unit.MyDeploySequence) return;
