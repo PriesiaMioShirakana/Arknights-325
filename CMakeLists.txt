@@ -1,0 +1,394 @@
+cmake_minimum_required(VERSION 3.25)
+project(stronghold_backend VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+include(CTest)
+
+add_library(
+  stronghold_core
+  "${PROJECT_SOURCE_DIR}/src/scheduler.cpp"
+  "${PROJECT_SOURCE_DIR}/src/catalog.cpp"
+  "${PROJECT_SOURCE_DIR}/src/bonds.cpp"
+  "${PROJECT_SOURCE_DIR}/src/pool.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_roster.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_summons.cpp"
+  "${PROJECT_SOURCE_DIR}/src/preparation_economy_effects.cpp"
+  "${PROJECT_SOURCE_DIR}/src/inventory.cpp"
+  "${PROJECT_SOURCE_DIR}/src/inventory_effects.cpp"
+  "${PROJECT_SOURCE_DIR}/src/placement.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_movement.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_combat.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_status.cpp"
+  "${PROJECT_SOURCE_DIR}/src/attributes.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_buffs.cpp"
+  "${PROJECT_SOURCE_DIR}/src/content_registry.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_content.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_choices.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_skills.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_elements.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_attacks.cpp"
+  "${PROJECT_SOURCE_DIR}/src/field.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_pathing.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_induced_movement.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_displacement.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_spawns.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_tiles.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_stealth.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_terrain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_devices.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_scheduled.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_boss.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_professions.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_doll.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_economy.cpp"
+  "${PROJECT_SOURCE_DIR}/src/unite.cpp"
+  "${PROJECT_SOURCE_DIR}/src/settlement.cpp"
+  "${PROJECT_SOURCE_DIR}/src/strategy_draft.cpp"
+  "${PROJECT_SOURCE_DIR}/src/special_draft.cpp"
+  "${PROJECT_SOURCE_DIR}/src/choice_generation.cpp"
+  "${PROJECT_SOURCE_DIR}/src/content_pools.cpp"
+  "${PROJECT_SOURCE_DIR}/src/choice_rewards.cpp"
+  "${PROJECT_SOURCE_DIR}/src/final_assault.cpp"
+  "${PROJECT_SOURCE_DIR}/src/boss_battle_group.cpp"
+  "${PROJECT_SOURCE_DIR}/src/battle_profession_effects.cpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/simulation/battle.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/simulation/combat_types.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/domain/board.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/core/random.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/core/scheduler.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/domain/catalog.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/domain/pool.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/domain/combat_math.hpp"
+  "${PROJECT_SOURCE_DIR}/include/stronghold/domain/preparation.hpp"
+)
+add_library(Stronghold::Core ALIAS stronghold_core)
+target_include_directories(stronghold_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_compile_features(stronghold_core PUBLIC cxx_std_23)
+
+function(stronghold_warnings target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+  endif()
+endfunction()
+stronghold_warnings(stronghold_core)
+
+# Consumers also compile inline numeric rules, so deterministic floating-point flags are public.
+if(MSVC)
+  target_compile_options(stronghold_core PUBLIC /fp:strict)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+  target_compile_options(stronghold_core PUBLIC -fno-fast-math -ffp-contract=off)
+endif()
+
+# The reference is a build-time data/oracle input, never a JavaScript runtime dependency.
+set(STRONGHOLD_REFERENCE_DIR "${PROJECT_SOURCE_DIR}/../Stronghold-Protocol" CACHE PATH "Original JS repository")
+option(STRONGHOLD_BUILD_CATALOG "Compile the reference JSON economy catalog" ON)
+if(STRONGHOLD_BUILD_CATALOG)
+  find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+  set(catalog_source "${PROJECT_BINARY_DIR}/generated/reference_catalog.cpp")
+  add_custom_command(OUTPUT "${catalog_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_catalog.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${catalog_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_catalog.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/config.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/chess.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/items.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/stages.json"
+    VERBATIM)
+  set(combat_source "${PROJECT_BINARY_DIR}/generated/reference_combat.cpp")
+  add_custom_command(OUTPUT "${combat_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${combat_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_stage.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_wave.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/waves.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/stages.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/enemies.json"
+    VERBATIM)
+  set(ally_source "${PROJECT_BINARY_DIR}/generated/reference_ally.cpp")
+  set(ally_header "${PROJECT_BINARY_DIR}/generated/reference_ally_data.hpp")
+  set(ally_shards)
+  foreach(index RANGE 0 11)
+    list(APPEND ally_shards "${PROJECT_BINARY_DIR}/generated/reference_ally_${index}.cpp")
+  endforeach()
+  add_custom_command(OUTPUT "${ally_source}" "${ally_header}" ${ally_shards}
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_ally.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${ally_source}" --shards 12
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_ally.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_roster.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_profession.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/backups.json"
+      "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/chess.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/tokens.json"
+    VERBATIM)
+  set(wave_generation_source "${PROJECT_BINARY_DIR}/generated/reference_wave_generation.cpp")
+  set(match_source "${PROJECT_BINARY_DIR}/generated/reference_match.cpp")
+  set(bonds_source "${PROJECT_BINARY_DIR}/generated/reference_bonds.cpp")
+  set(roster_source "${PROJECT_BINARY_DIR}/generated/reference_roster.cpp")
+  add_custom_command(OUTPUT "${roster_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_player_roster.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${roster_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_player_roster.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/chess.json" "${STRONGHOLD_REFERENCE_DIR}/data/backups.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/tokens.json"
+    VERBATIM)
+  add_custom_command(OUTPUT "${bonds_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_bonds.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${bonds_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_bonds.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${PROJECT_SOURCE_DIR}/tools/generate_match.py" "${STRONGHOLD_REFERENCE_DIR}/data/bonds.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/chess.json" "${STRONGHOLD_REFERENCE_DIR}/data/items.json"
+    VERBATIM)
+  set(choices_source "${PROJECT_BINARY_DIR}/generated/reference_choices.cpp")
+  add_custom_command(OUTPUT "${choices_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_choices.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${choices_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_choices.py" "${PROJECT_SOURCE_DIR}/tools/generate_choice_rewards.py" "${PROJECT_SOURCE_DIR}/tools/generate_choice_battle.py" "${PROJECT_SOURCE_DIR}/tools/generate_preparation_items.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/choices.json" "${STRONGHOLD_REFERENCE_DIR}/data/items.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/enemies.json" "${STRONGHOLD_REFERENCE_DIR}/data/effects.json"
+    VERBATIM)
+  add_custom_command(OUTPUT "${match_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_match.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${match_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_match.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/config.json" "${STRONGHOLD_REFERENCE_DIR}/data/bands.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/bosses.json"
+    VERBATIM)
+  add_custom_command(OUTPUT "${wave_generation_source}"
+    COMMAND "${Python3_EXECUTABLE}" -X utf8 "${PROJECT_SOURCE_DIR}/tools/generate_wave_generation.py"
+      --data "${STRONGHOLD_REFERENCE_DIR}/data" --out "${wave_generation_source}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/tools/generate_wave_generation.py" "${PROJECT_SOURCE_DIR}/tools/generate_combat.py"
+      "${STRONGHOLD_REFERENCE_DIR}/data/config.json" "${STRONGHOLD_REFERENCE_DIR}/data/factions.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/enemies.json" "${STRONGHOLD_REFERENCE_DIR}/data/stages.json"
+      "${STRONGHOLD_REFERENCE_DIR}/data/bosses.json"
+    VERBATIM)
+  add_library(stronghold_catalog "${wave_generation_source}" "${PROJECT_SOURCE_DIR}/src/wave_generation.cpp" "${PROJECT_SOURCE_DIR}/src/wave_extras.cpp" "${catalog_source}" "${combat_source}" "${ally_source}" ${ally_shards} "${PROJECT_SOURCE_DIR}/src/reference_ally.cpp" "${PROJECT_SOURCE_DIR}/src/reference_stage.cpp" "${PROJECT_SOURCE_DIR}/src/reference_wave.cpp")
+  # MSVC's debug constant evaluation can use substantial memory for roster tables.
+  target_sources(stronghold_catalog PRIVATE "${match_source}")
+  target_sources(stronghold_catalog PRIVATE "${roster_source}" "${PROJECT_SOURCE_DIR}/src/reference_roster.cpp")
+  target_sources(stronghold_catalog PRIVATE "${choices_source}" "${bonds_source}" "${PROJECT_SOURCE_DIR}/src/reference_preparation.cpp" "${PROJECT_SOURCE_DIR}/src/reference_choice_effects.cpp")
+  # Keep the data in separate source files and bound simultaneous compilers on Ninja/VS CMake.
+  set_property(GLOBAL APPEND PROPERTY JOB_POOLS stronghold_data_compile=2)
+  set_property(TARGET stronghold_catalog PROPERTY JOB_POOL_COMPILE stronghold_data_compile)
+  stronghold_warnings(stronghold_catalog)
+  target_link_libraries(stronghold_catalog PUBLIC Stronghold::Core)
+  add_executable(stronghold_cli "${PROJECT_SOURCE_DIR}/apps/main.cpp")
+  target_link_libraries(stronghold_cli PRIVATE stronghold_catalog)
+  stronghold_warnings(stronghold_cli)
+endif()
+
+if(BUILD_TESTING)
+  add_executable(stronghold_final_assault_battle_tests "${PROJECT_SOURCE_DIR}/tests/final_assault_battle_tests.cpp")
+  target_link_libraries(stronghold_final_assault_battle_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_final_assault_battle_tests)
+  add_test(NAME final_assault_battle_core COMMAND stronghold_final_assault_battle_tests)
+  add_executable(stronghold_tests "${PROJECT_SOURCE_DIR}/tests/core_tests.cpp")
+  target_link_libraries(stronghold_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_tests)
+  add_test(NAME core COMMAND stronghold_tests)
+  add_executable(stronghold_battle_tests "${PROJECT_SOURCE_DIR}/tests/battle_tests.cpp")
+  target_link_libraries(stronghold_battle_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_battle_tests)
+  add_test(NAME battle_core COMMAND stronghold_battle_tests)
+  add_executable(stronghold_effect_tests "${PROJECT_SOURCE_DIR}/tests/effects_tests.cpp")
+  target_link_libraries(stronghold_effect_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_effect_tests)
+  add_test(NAME effects_core COMMAND stronghold_effect_tests)
+  add_executable(stronghold_content_tests "${PROJECT_SOURCE_DIR}/tests/content_tests.cpp")
+  target_link_libraries(stronghold_content_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_content_tests)
+  add_test(NAME content_core COMMAND stronghold_content_tests)
+  add_executable(stronghold_skill_tests "${PROJECT_SOURCE_DIR}/tests/skill_tests.cpp")
+  target_link_libraries(stronghold_skill_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_skill_tests)
+  add_test(NAME skill_core COMMAND stronghold_skill_tests)
+  add_executable(stronghold_element_tests "${PROJECT_SOURCE_DIR}/tests/element_tests.cpp")
+  target_link_libraries(stronghold_element_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_element_tests)
+  add_executable(stronghold_attack_tests "${PROJECT_SOURCE_DIR}/tests/attack_tests.cpp")
+  target_link_libraries(stronghold_attack_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_attack_tests)
+  add_test(NAME attack_core COMMAND stronghold_attack_tests)
+  add_executable(stronghold_field_probe "${PROJECT_SOURCE_DIR}/tests/field_probe.cpp")
+  target_link_libraries(stronghold_field_probe PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_field_probe)
+  foreach(probe IN ITEMS body stealth terrain turret cold_wind skill_trigger healing enemy_healing boss_pool carry profession_attack profession_state profession_effect profession_projectile tactical doll bounty unite settlement strategy_draft final_assault special_draft layer_gains)
+    add_executable(stronghold_${probe}_probe "${PROJECT_SOURCE_DIR}/tests/${probe}_probe.cpp")
+    target_link_libraries(stronghold_${probe}_probe PRIVATE Stronghold::Core)
+    stronghold_warnings(stronghold_${probe}_probe)
+  endforeach()
+  add_executable(stronghold_spawn_tests "${PROJECT_SOURCE_DIR}/tests/spawn_tests.cpp")
+  target_link_libraries(stronghold_spawn_tests PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_spawn_tests)
+  add_test(NAME spawn_core COMMAND stronghold_spawn_tests)
+  add_executable(stronghold_displacement_probe "${PROJECT_SOURCE_DIR}/tests/displacement_probe.cpp")
+  target_link_libraries(stronghold_displacement_probe PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_displacement_probe)
+  add_executable(stronghold_pathing_probe "${PROJECT_SOURCE_DIR}/tests/pathing_probe.cpp")
+  target_link_libraries(stronghold_pathing_probe PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_pathing_probe)
+  add_executable(stronghold_battle_probe "${PROJECT_SOURCE_DIR}/tests/battle_probe.cpp")
+  target_link_libraries(stronghold_battle_probe PRIVATE Stronghold::Core)
+  stronghold_warnings(stronghold_battle_probe)
+  if(STRONGHOLD_BUILD_CATALOG)
+    add_executable(stronghold_choice_battle_probe "${PROJECT_SOURCE_DIR}/tests/choice_battle_probe.cpp")
+    target_link_libraries(stronghold_choice_battle_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_choice_battle_probe)
+    add_executable(stronghold_choice_rewards_probe "${PROJECT_SOURCE_DIR}/tests/choice_rewards_probe.cpp")
+    target_link_libraries(stronghold_choice_rewards_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_choice_rewards_probe)
+    add_executable(stronghold_content_pools_probe "${PROJECT_SOURCE_DIR}/tests/content_pools_probe.cpp")
+    target_link_libraries(stronghold_content_pools_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_content_pools_probe)
+    add_executable(stronghold_summons_probe "${PROJECT_SOURCE_DIR}/tests/summons_probe.cpp")
+    target_link_libraries(stronghold_summons_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_summons_probe)
+    add_executable(stronghold_diy_stock_probe "${PROJECT_SOURCE_DIR}/tests/diy_stock_probe.cpp")
+    target_link_libraries(stronghold_diy_stock_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_diy_stock_probe)
+    add_executable(stronghold_roster_probe "${PROJECT_SOURCE_DIR}/tests/roster_probe.cpp")
+    target_link_libraries(stronghold_roster_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_roster_probe)
+    add_executable(stronghold_bonds_probe "${PROJECT_SOURCE_DIR}/tests/bonds_probe.cpp")
+    target_link_libraries(stronghold_bonds_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_bonds_probe)
+    add_executable(stronghold_inventory_probe "${PROJECT_SOURCE_DIR}/tests/inventory_probe.cpp")
+    target_link_libraries(stronghold_inventory_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_inventory_probe)
+    add_executable(stronghold_choice_generation_probe "${PROJECT_SOURCE_DIR}/tests/choice_generation_probe.cpp")
+    target_link_libraries(stronghold_choice_generation_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_choice_generation_probe)
+    add_executable(stronghold_match_catalog_probe "${PROJECT_SOURCE_DIR}/tests/match_catalog_probe.cpp")
+    target_link_libraries(stronghold_match_catalog_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_match_catalog_probe)
+    add_executable(stronghold_wave_generation_probe "${PROJECT_SOURCE_DIR}/tests/wave_generation_probe.cpp")
+    target_link_libraries(stronghold_wave_generation_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_wave_generation_probe)
+    add_executable(stronghold_ally_catalog_probe "${PROJECT_SOURCE_DIR}/tests/ally_catalog_probe.cpp")
+    target_link_libraries(stronghold_ally_catalog_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_ally_catalog_probe)
+    add_executable(stronghold_combat_catalog_probe "${PROJECT_SOURCE_DIR}/tests/combat_catalog_probe.cpp")
+    target_link_libraries(stronghold_combat_catalog_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_combat_catalog_probe)
+    add_executable(stronghold_stage_catalog_probe "${PROJECT_SOURCE_DIR}/tests/stage_catalog_probe.cpp")
+    target_link_libraries(stronghold_stage_catalog_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_stage_catalog_probe)
+    add_executable(stronghold_wave_catalog_probe "${PROJECT_SOURCE_DIR}/tests/wave_catalog_probe.cpp")
+    target_link_libraries(stronghold_wave_catalog_probe PRIVATE stronghold_catalog)
+    stronghold_warnings(stronghold_wave_catalog_probe)
+    add_test(NAME catalog_smoke COMMAND stronghold_cli catalog)
+    find_program(STRONGHOLD_NODE node)
+    if(STRONGHOLD_NODE)
+      add_test(NAME choice_battle_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/choice_battle_parity.mjs"
+        --native $<TARGET_FILE:stronghold_choice_battle_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME choice_rewards_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/choice_rewards_parity.mjs"
+        --native $<TARGET_FILE:stronghold_choice_rewards_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME content_pools_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/content_pools_parity.mjs"
+        --native $<TARGET_FILE:stronghold_content_pools_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME summons_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/summons_parity.mjs"
+        --native $<TARGET_FILE:stronghold_summons_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME diy_stock_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/diy_stock_parity.mjs"
+        --native $<TARGET_FILE:stronghold_diy_stock_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME roster_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/roster_parity.mjs"
+        --native $<TARGET_FILE:stronghold_roster_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME bonds_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/bonds_parity.mjs"
+        --native $<TARGET_FILE:stronghold_bonds_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME inventory_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/inventory_parity.mjs"
+        --native $<TARGET_FILE:stronghold_inventory_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME choice_generation_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/choice_generation_parity.mjs"
+        --native $<TARGET_FILE:stronghold_choice_generation_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME match_catalog_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/match_catalog_parity.mjs"
+        --native $<TARGET_FILE:stronghold_match_catalog_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME wave_generation_javascript_parity
+      COMMAND "${STRONGHOLD_NODE}" "${PROJECT_SOURCE_DIR}/tests/wave_generation_parity.mjs"
+        --native $<TARGET_FILE:stronghold_wave_generation_probe> --reference "${STRONGHOLD_REFERENCE_DIR}")
+      add_test(NAME ally_catalog_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/ally_catalog_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_ally_catalog_probe>")
+      set_tests_properties(ally_catalog_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME wave_catalog_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/wave_catalog_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_wave_catalog_probe>")
+      set_tests_properties(wave_catalog_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME stage_catalog_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/stage_catalog_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_stage_catalog_probe>")
+      set_tests_properties(stage_catalog_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME combat_catalog_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/combat_catalog_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_combat_catalog_probe>")
+      set_tests_properties(combat_catalog_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_cli>")
+      set_tests_properties(javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME battle_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/battle_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_battle_probe>")
+      set_tests_properties(battle_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME effects_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/effects_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_effect_tests>")
+      set_tests_properties(effects_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME skill_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/skill_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_skill_tests>")
+      set_tests_properties(skill_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME element_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/element_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_element_tests>")
+      set_tests_properties(element_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME attack_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/attack_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_attack_tests>")
+      set_tests_properties(attack_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME field_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/field_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_field_probe>")
+      set_tests_properties(field_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME pathing_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/pathing_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_pathing_probe>")
+      set_tests_properties(pathing_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME displaced_pathing_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/pathing_parity.mjs" --displaced
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_pathing_probe>")
+      set_tests_properties(displaced_pathing_javascript_parity PROPERTIES TIMEOUT 60)
+      foreach(probe IN ITEMS body stealth terrain turret cold_wind skill_trigger healing enemy_healing boss_pool carry profession_attack profession_state profession_effect profession_projectile tactical doll bounty unite settlement strategy_draft final_assault special_draft layer_gains)
+        add_test(NAME ${probe}_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+          "${PROJECT_SOURCE_DIR}/tests/${probe}_parity.mjs"
+          --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_${probe}_probe>")
+        set_tests_properties(${probe}_javascript_parity PROPERTIES TIMEOUT 60)
+      endforeach()
+      add_test(NAME spawn_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/spawn_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_spawn_tests>")
+      set_tests_properties(spawn_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME displacement_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/displacement_parity.mjs"
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_displacement_probe>")
+      set_tests_properties(displacement_javascript_parity PROPERTIES TIMEOUT 60)
+      add_test(NAME induced_movement_javascript_parity COMMAND "${STRONGHOLD_NODE}"
+        "${PROJECT_SOURCE_DIR}/tests/pathing_parity.mjs" --induced
+        --reference "${STRONGHOLD_REFERENCE_DIR}" --native "$<TARGET_FILE:stronghold_pathing_probe>")
+      set_tests_properties(induced_movement_javascript_parity PROPERTIES TIMEOUT 60)
+    endif()
+  endif()
+endif()

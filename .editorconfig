@@ -1,0 +1,92 @@
+
+[*.{appxmanifest,axml,blockshader,c,c++,c++m,cc,ccm,cginc,compute,config,cp,cpp,cppm,cshtml,csproj,cu,cuh,cxx,cxxm,dbml,discomap,dtd,fx,fxh,h,h++,hh,hlsl,hlsli,hlslinc,hp,hpp,htm,html,hxx,icc,inc,inl,ino,ipp,ixx,jsproj,lsproj,mpp,mq4,mq5,mqh,mxx,njsproj,nuspec,proj,props,pssl,pssli,razor,resw,resx,shaderFoundry,StyleCop,targets,tasks,tcc,tpp,urtshader,usf,ush,vbproj,xml,xsd}]
+indent_style = tab
+indent_size = tab
+tab_width = 4
+
+[*.{asax,ascx,aspx,axaml,cs,master,paml,skin,vb,xaml,xamlx,xoml}]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*]
+
+# Microsoft .NET properties
+csharp_new_line_before_members_in_object_initializers = false
+csharp_preferred_modifier_order = public, private, protected, internal, file, new, static, abstract, virtual, sealed, readonly, override, extern, unsafe, volatile, async, required:suggestion
+csharp_style_prefer_utf8_string_literals = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+dotnet_style_parentheses_in_arithmetic_binary_operators = never_if_unnecessary:none
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:none
+dotnet_style_parentheses_in_relational_binary_operators = never_if_unnecessary:none
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
+
+# ReSharper properties
+resharper_cpp_alignment_tab_fill_style = optimal_fill
+resharper_cpp_empty_block_style = together_same_line
+resharper_cpp_indent_style = tab
+resharper_cpp_keep_user_linebreaks = false
+resharper_cpp_use_indent_from_vs = false
+resharper_cpp_wrap_arguments_style = chop_if_long
+resharper_cpp_wrap_parameters_style = chop_if_long
+resharper_labeled_statement_style = do_not_change
+resharper_linkage_specification_braces = next_line
+resharper_requires_expression_braces = end_of_line
+resharper_simple_block_style = on_single_line
+resharper_space_after_ellipsis_in_parameter_pack = false
+resharper_space_before_ellipsis_in_parameter_pack = true
+resharper_space_within_empty_blocks = true
+resharper_space_within_empty_template_params = true
+resharper_wrap_after_declaration_lpar = true
+resharper_wrap_after_invocation_lpar = true
+resharper_wrap_base_clause_style = chop_if_long
+resharper_wrap_before_colon = true
+resharper_wrap_before_declaration_rpar = true
+resharper_wrap_before_invocation_rpar = true
+resharper_wrap_braced_init_list_style = chop_if_long
+resharper_wrap_ctor_initializer_style = chop_if_long
+
+# ReSharper inspection severities
+resharper_arrange_redundant_parentheses_highlighting = hint
+resharper_arrange_this_qualifier_highlighting = hint
+resharper_arrange_type_member_modifiers_highlighting = hint
+resharper_arrange_type_modifiers_highlighting = hint
+resharper_built_in_type_reference_style_for_member_access_highlighting = hint
+resharper_built_in_type_reference_style_highlighting = hint
+resharper_comment_typo_highlighting = hint
+resharper_cpp_abstract_final_class_highlighting = error
+resharper_cpp_boost_format_bad_code_highlighting = error
+resharper_cpp_boost_format_too_many_args_highlighting = error
+resharper_cpp_clang_tidy_bugprone_reserved_identifier_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_error_highlighting = error
+resharper_cpp_clang_tidy_clang_diagnostic_reserved_attribute_identifier_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_reserved_identifier_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_reserved_id_macro_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_reserved_macro_identifier_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_reserved_module_identifier_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_reserved_user_defined_literal_highlighting = none
+resharper_cpp_clang_tidy_clang_diagnostic_unused_macros_highlighting = hint
+resharper_cpp_clang_tidy_misc_use_anonymous_namespace_highlighting = hint
+resharper_cpp_clang_tidy_misc_use_internal_linkage_highlighting = hint
+resharper_cpp_deprecated_entity_highlighting = error
+resharper_cpp_functional_style_cast_highlighting = none
+resharper_cpp_inconsistent_naming_highlighting = suggestion
+resharper_cpp_printf_risky_format_highlighting = error
+resharper_cpp_unmatched_pragma_end_region_directive_highlighting = error
+resharper_cpp_unmatched_pragma_region_directive_highlighting = error
+resharper_identifier_typo_highlighting = hint
+resharper_markup_attribute_typo_highlighting = hint
+resharper_markup_text_typo_highlighting = hint
+resharper_redundant_base_qualifier_highlighting = warning
+resharper_string_literal_typo_highlighting = hint
+resharper_suggest_var_or_type_built_in_types_highlighting = hint
+resharper_suggest_var_or_type_elsewhere_highlighting = hint
+resharper_suggest_var_or_type_simple_types_highlighting = hint

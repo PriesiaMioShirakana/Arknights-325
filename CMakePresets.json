@@ -1,0 +1,13 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Native C++23 toolchain",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": { "BUILD_TESTING": "ON", "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [{ "name": "default", "configurePreset": "default", "configuration": "Debug" }],
+  "testPresets": [{ "name": "default", "configurePreset": "default", "configuration": "Debug", "output": { "outputOnFailure": true } }]
+}

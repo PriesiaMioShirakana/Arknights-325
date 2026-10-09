@@ -1,0 +1,1733 @@
+{
+  "SettingsFile": "C:\\Users\\17518\\AppData\\Roaming\\JetBrains\\Shared\\vAny\\GlobalSettingsStorage.DotSettings",
+  "PluginFile": "C:\\Users\\17518\\AppData\\Local\\JetBrains\\Installations\\ReSharperPlatformVs18_1c1da9d3_000\\JetBrains.ReSharper.Feature.Services.Cpp.dll",
+  "AssemblyVersion": "777.0.0.0",
+  "Note": "Authoritative persisted machine formatting snapshot, refreshed 2026-10-08. Defaults retained from installed assembly metadata (same installation and version). Unsaved UI values and contextual runtime overrides are not inspected.",
+  "Settings": [
+    {
+      "Name": "KEEP_USER_LINEBREAKS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": false,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "CONTINUOUS_LINE_INDENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "Single",
+      "Value": "Single",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "NAMESPACE_DECLARATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "TYPE_DECLARATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INVOCABLE_DECLARATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "CXXCLI_PROPERTY_DECLARATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ANONYMOUS_METHOD_DECLARATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "CASE_BLOCK_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE_SHIFTED_2",
+      "Value": "NEXT_LINE_SHIFTED_2",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "OTHER_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "FREE_BLOCK_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINKAGE_SPECIFICATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "END_OF_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "REQUIRES_EXPRESSION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "END_OF_LINE",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "EXPORT_DECLARATION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "NEXT_LINE",
+      "Value": "NEXT_LINE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "MACRO_BLOCK_BEGIN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "",
+      "Value": "",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "MACRO_BLOCK_END",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "",
+      "Value": "",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "EXPRESSION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "INSIDE",
+      "Value": "INSIDE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "EXPRESSION_PARS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "INSIDE",
+      "Value": "INSIDE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_METHOD_DECL_PARS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "INSIDE",
+      "Value": "INSIDE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_INVOCATION_PARS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "INSIDE",
+      "Value": "INSIDE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_STATEMENT_PARS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "INSIDE",
+      "Value": "INSIDE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "USE_CONTINUOUS_LINE_INDENT_IN_METHOD_PARS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "USE_CONTINUOUS_LINE_INDENT_IN_EXPRESSION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPECIAL_ELSE_IF_TREATMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_ACCESS_SPECIFIERS_FROM_CLASS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_CLASS_MEMBERS_FROM_ACCESS_SPECIFIERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_WRAPPED_FUNCTION_NAMES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_CASE_FROM_SWITCH",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_GOTO_LABELS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_TYPE_CONSTRAINTS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "OUTDENT_NAMESPACE_MEMBER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "NAMESPACE_INDENTATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "All",
+      "Value": "All",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINKAGE_SPECIFICATION_INDENTATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "None",
+      "Value": "None",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_EXPORT_DECLARATION_MEMBERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_NAMESPACE_DEFINITIONS_ON_SAME_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_COMMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_COMMENTS_AT_FIRST_COLUMN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_PREPROCESSOR_DIRECTIVES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "None",
+      "Value": "None",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_MEMBER_INITIALIZER_LIST",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "EMPTY_BLOCK_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "MULTILINE",
+      "Value": "TOGETHER_SAME_LINE",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "PLACE_ELSE_ON_NEW_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_WHILE_ON_NEW_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_CATCH_ON_NEW_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_ENUMERATORS_ON_NEW_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_TYPE_CONSTRAINTS_ON_SAME_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BEFORE_FIRST_TYPE_PARAMETER_CONSTRAINT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_MULTIPLE_TYPE_PARAMETER_CONSTRAINTS_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "CHOP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SIMPLE_EMBEDDED_STATEMENT_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "FUNCTION_DECLARATION_RETURN_TYPE_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "TOPLEVEL_FUNCTION_DECLARATION_RETURN_TYPE_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "FUNCTION_DEFINITION_RETURN_TYPE_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "TOPLEVEL_FUNCTION_DEFINITION_RETURN_TYPE_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BREAK_TEMPLATE_DECLARATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "LINE_BREAK",
+      "Value": "LINE_BREAK",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_BEFORE_REQUIRES_CLAUSE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "MEMBER_INITIALIZER_LIST_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_AFTER_COLON_IN_MEMBER_INITIALIZER_LISTS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SIMPLE_BLOCK_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "ON_SINGLE_LINE",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "SIMPLE_CASE_STATEMENT_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LABELED_STATEMENT_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "LINE_BREAK",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "LINE_BREAK_AFTER_INIT_STATEMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_BEFORE_DEREF_IN_TRAILING_RETURN_TYPES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_AFTER_DEREF_IN_TRAILING_RETURN_TYPES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_BEFORE_FUNCTION_TRY_BLOCK",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "DO_NOT_CHANGE",
+      "Value": "DO_NOT_CHANGE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALLOW_COMMENT_AFTER_LBRACE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTIPLE_DECLARATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_PARAMETER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_ARGUMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_FIRST_ARG_BY_PAREN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_TYPE_PARAMETER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_TYPE_ARGUMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_EXTENDS_LIST",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_CTOR_INIT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_EXPRESSION_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "OUTDENT_COMMAS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "OUTDENT_DOTS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_BEFORE_COMMA_IN_MEMBER_INITIALIZER_LISTS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_BREAK_AFTER_COMMA_IN_MEMBER_INITIALIZER_LISTS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_TERNARY",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "ALIGN_NOT_NESTED",
+      "Value": "ALIGN_NOT_NESTED",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_ALIGNED_TERNARY",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_CALLS_CHAIN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_BINARY_EXPRESSIONS_CHAIN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGN_MULTILINE_FOR_STMT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_EQ",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_DECLARATION_NAMES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_COMMENTS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_ENUM_INITIALIZERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_BITFIELD_SIZES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_DESIGNATED_INITIALIZERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_AFTER_DOT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BEFORE_COMMA",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BEFORE_COMMA_IN_BASE_CLAUSE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_AFTER_BINARY_OPSIGN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BEFORE_TERNARY_OPSIGNS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BEFORE_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_BEFORE_DECLARATION_LPAR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_AFTER_DECLARATION_LPAR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_BEFORE_INVOCATION_LPAR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_AFTER_INVOCATION_LPAR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_BEFORE_DECLARATION_RPAR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_BEFORE_INVOCATION_RPAR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_AFTER_EXPRESSION_LBRACE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BEFORE_EXPRESSION_RBRACE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_ENUMERATION_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "CHOP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_BRACED_INIT_LIST_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "WRAP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_BASE_CLAUSE_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "WRAP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_CTOR_INITIALIZER_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "WRAP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_PARAMETERS_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "WRAP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_ARGUMENTS_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "WRAP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "WRAP_TERNARY_EXPR_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "CHOP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "MAX_ENUM_MEMBERS_ON_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 3,
+      "Value": 3,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "KEEP_EXISTING_ENUM_ARRANGEMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "PLACE_ENUM_ON_SINGLE_LINE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "KEEP_BLANK_LINES_IN_DECLARATIONS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 2,
+      "Value": 2,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "KEEP_BLANK_LINES_IN_CODE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 2,
+      "Value": 2,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "REMOVE_BLANK_LINES_NEAR_BRACES_IN_DECLARATIONS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "REMOVE_BLANK_LINES_NEAR_BRACES_IN_CODE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AROUND_NAMESPACE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 1,
+      "Value": 1,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AROUND_CLASS_DEFINITION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 1,
+      "Value": 1,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AROUND_FUNCTION_DEFINITION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 1,
+      "Value": 1,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AROUND_FUNCTION_DECLARATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 0,
+      "Value": 0,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AROUND_SINGLE_LINE_FUNCTION_DEFINITION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 0,
+      "Value": 0,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AROUND_OTHER_DECLARATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 0,
+      "Value": 0,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_BEFORE_ACCESS_SPECIFIER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 1,
+      "Value": 1,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "BLANK_LINES_AFTER_ACCESS_SPECIFIER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 0,
+      "Value": 0,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_FOR_SEMICOLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_FOR_SEMICOLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_PTR_IN_DATA_MEMBER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_PTR_IN_DATA_MEMBER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_PTR_IN_DATA_MEMBERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_PTR_IN_DATA_MEMBERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_PTR_IN_METHOD",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_PTR_IN_METHOD",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_PTR_IN_ABSTRACT_DECL",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_PTR_IN_NESTED_DECLARATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_REF_IN_DATA_MEMBER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_REF_IN_DATA_MEMBER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_REF_IN_DATA_MEMBERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_REF_IN_DATA_MEMBERS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_REF_IN_METHOD",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_REF_IN_METHOD",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_REF_IN_ABSTRACT_DECL",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_DECLARATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_DECLARATION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_METHOD",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_METHOD",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_ENUM",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_ENUM",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_BASE_CLAUSE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_BASE_CLAUSE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_METHOD_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_LAMBDA_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_METHOD_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_EMPTY_METHOD_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_DECLARATION_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_TEMPLATE_PARAMS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_TEMPLATE_PARAMS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_EMPTY_TEMPLATE_PARAMS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_TEMPLATE_PARAMS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_TEMPLATE_PARAMS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_TEMPLATE_ARGS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_TEMPLATE_ARGS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_TEMPLATE_ARGS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_TEMPLATE_ARGS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BETWEEN_CLOSING_ANGLE_BRACKETS_IN_TEMPLATE_ARGS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_ELLIPSIS_IN_PARAMETER_PACK",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "SPACE_AFTER_ELLIPSIS_IN_PARAMETER_PACK",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": false,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "SPACE_BEFORE_METHOD_CALL_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_EMPTY_METHOD_CALL_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_CAST_EXPRESSION_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_CAST_EXPRESSION_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_METHOD_CALL_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_EMPTY_METHOD_CALL_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_METHOD_CALL",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_METHOD_CALL",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COMMA_IN_INITIALIZER_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COMMA_IN_INITIALIZER_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_EXTENDS_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_EXTENDS_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_TYPE_PARAMETER_CONSTRAINT_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_TYPE_PARAMETER_CONSTRAINT_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_STATEMENT_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_STATEMENT_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_ARRAY_ACCESS_BRACKETS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_ARRAY_ACCESS_BRACKETS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_TERNARY_QUEST",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_TERNARY_QUEST",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_TERNARY_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_TERNARY_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_INITIALIZER_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_INITIALIZER_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_EMPTY_INITIALIZER_BRACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_EMPTY_BLOCKS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": true,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "SPACE_AFTER_UNARY_OPERATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_OPERATOR_NOT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_POSTFIX_OPERATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_EQ_IN_ALIAS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AROUND_BINARY_OPERATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AROUND_ASSIGNMENT_OPERATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AROUND_DOT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AROUND_DEREF_IN_TRAILING_RETURN_TYPE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_FOR_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_FOR_COLON",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_WITHIN_PARENTHESES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COLON_IN_CASE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COLON_IN_CASE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_SPACE_CHANGES_BEFORE_TRAILING_COMMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_TRAILING_COMMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COLON_IN_CTOR_INITIALIZER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_BEFORE_COLON_IN_BITFIELD_DECLARATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_COLON_IN_BITFIELD_DECLARATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "GeneratorMode",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DontRemoveExtraBlankLines",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ENABLE_SLATE_FORMAT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SPACE_AFTER_SLATE_OPERATOR",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SLATE_BRACKETS_INDENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "INSIDE",
+      "Value": "INSIDE",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SLATE_BRACKETS_WRAP",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "CHOP_ALWAYS",
+      "Value": "CHOP_ALWAYS",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SLATE_WRAP_BEFORE_BRACKET",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SLATE_WRAP_CHAINED_BINARY_EXPRESSION",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "CHOP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "SLATE_WRAP_CHAINED_MEMBER_ACCESS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "CHOP_IF_LONG",
+      "Value": "CHOP_IF_LONG",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INDENT_DECLARATION_AFTER_UFUNCTION_AND_UPROPERTY",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "USE_INDENT_FROM_VS",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": false,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "INDENT_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "Space",
+      "Value": "Tab",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "INDENT_SIZE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 4,
+      "Value": 4,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "TAB_WIDTH",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 4,
+      "Value": 4,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_LINES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "WRAP_LIMIT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 120,
+      "Value": 120,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "LINE_FEED_AT_FILE_END",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "REMOVE_SPACES_ON_BLANK_LINES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "EXTRA_SPACES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "REMOVE_ALL",
+      "Value": "REMOVE_ALL",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_FORMATTER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_INDENTER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_LINE_BREAK_CHANGES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_LINE_BREAK_REMOVAL",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_SPACE_CHANGES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_BLANK_LINE_CHANGES",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "DISABLE_INT_ALIGN",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "KEEP_USER_WRAPPING",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "USE_INDENT_FROM_PREVIOUS_ELEMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "INT_ALIGN_FIX_IN_ADJACENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": true,
+      "Value": true,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "FORMAT_LEADING_SPACES_DECL",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ALIGNMENT_TAB_FILL_STYLE",
+      "Section": "CppFormattingSettingsKey",
+      "Default": "USE_SPACES",
+      "Value": "OPTIMAL_FILL",
+      "Source": "This computer override"
+    },
+    {
+      "Name": "ALLOW_FAR_ALIGNMENT",
+      "Section": "CppFormattingSettingsKey",
+      "Default": false,
+      "Value": false,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "CONTINUOUS_INDENT_MULTIPLIER",
+      "Section": "CppFormattingSettingsKey",
+      "Default": 1,
+      "Value": 1,
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "EnableClangFormatSupport",
+      "Section": "CppClangFormatSettings",
+      "Default": false,
+      "Value": false,
+      "Source": "This computer override"
+    },
+    {
+      "Name": "ClangCommandLineArguments",
+      "Section": "CppClangFormatSettings",
+      "Default": "",
+      "Value": "",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ExecutableToUse",
+      "Section": "CppClangFormatSettings",
+      "Default": "Bundled",
+      "Value": "Bundled",
+      "Source": "Installed plugin default"
+    },
+    {
+      "Name": "ExternalClangFormatPath",
+      "Section": "CppClangFormatSettings",
+      "Default": "",
+      "Value": "",
+      "Source": "Installed plugin default"
+    }
+  ],
+  "UnmatchedOverrides": [],
+  "SettingsLastWriteTime": "2026-10-08T23:02:14+08:00",
+  "EditorConfigEnabled": false
+}
