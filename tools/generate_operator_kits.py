@@ -3,6 +3,8 @@ import math
 import re
 from generate_combat import record, number, boolean, quote
 from generate_generic_skill import generic_modifiers, numeric
+from generate_standin_kits import build_standin_kit
+from generate_diy_kits import build_diy_operator_kit
 
 
 def num(value, fallback=0):
@@ -23,6 +25,11 @@ def bv(bb, key, fallback=0):
 
 
 def build_operator_kit(tables, key, raw, token=False):
+    if not token:
+        standin = build_standin_kit(tables, raw)
+        if standin is not None: return standin
+        diy = build_diy_operator_kit(tables, raw)
+        if diy is not None: return diy
     original = tables.chess.get(key)
     if token or not original or raw.get('isDiy') or raw.get('charId') != original.get('charId'):
         return 'nullptr'
@@ -39,7 +46,7 @@ def build_operator_kit(tables, key, raw, token=False):
     names.update({'chess_char_3_18_a':'Vulpis', 'chess_char_3_19_a':'Vigil', 'chess_char_3_20_a':'Kjera', 'chess_char_3_21_a':'Archet'})
     names.update({'chess_char_4_01_a':'Rmixer', 'chess_char_4_02_a':'Mostma', 'chess_char_4_03_a':'Kjera', 'chess_char_4_04_a':'Ines', 'chess_char_4_08_a':'Rosesa', 'chess_char_4_05_a':'Beewax', 'chess_char_4_06_a':'Kroos2', 'chess_char_4_07_a':'Bpipe', 'chess_char_4_09_a':'Mizuki', 'chess_char_4_10_a':'Aroma', 'chess_char_4_11_a':'Cathy', 'chess_char_4_12_a':'Glady', 'chess_char_4_13_a':'Gnosis', 'chess_char_4_14_a':'Lionhd', 'chess_char_4_15_a':'Reckpr', 'chess_char_4_16_a':'Texas2', 'chess_char_4_17_a':'Hsguma', 'chess_char_4_18_a':'Mudrok', 'chess_char_4_19_a':'Flamtl', 'chess_char_4_20_a':'Fartth', 'chess_char_4_21_a':'Plosis', 'chess_char_4_22_a':'Svrash', 'chess_char_4_23_a':'Gvial2', 'chess_char_4_24_a':'Billro', 'chess_char_4_25_a':'Cetsyr', 'chess_char_4_26_a':'Bldsk'})
     names.update({'chess_char_5_01_a':'Excu2', 'chess_char_5_02_a':'Titi', 'chess_char_5_03_a':'Blaze2', 'chess_char_5_05_a':'Ulpia', 'chess_char_5_06_a':'Etlchi', 'chess_char_5_07_a':'Surtr', 'chess_char_5_08_a':'Horn', 'chess_char_5_10_a':'Lisa', 'chess_char_5_11_a':'Demkni', 'chess_char_5_12_a':'Dusk', 'chess_char_5_13_a':'Ghost2', 'chess_char_5_14_a':'Svash2', 'chess_char_5_17_a':'F12yin', 'chess_char_5_20_a':'Aglina', 'chess_char_5_21_a':'Sntlla', 'chess_char_5_22_a':'Nymph', 'chess_char_5_19_a':'Mlynar', 'chess_char_5_15_a':'Thorn2', 'chess_char_5_04_a':'Bldsk', 'chess_char_5_09_a':'Cetsyr', 'chess_char_5_16_a':'Plosis', 'chess_char_5_18_a':'Gvial2', 'chess_char_5_23_a':'Reckpr'})
-    names.update({'chess_char_6_01_a':'Lemuen', 'chess_char_6_10_a':'Nymph', 'chess_char_6_05_a':'Pasngr', 'chess_char_6_06_a':'Pepe', 'chess_char_6_15_a':'Qiubai', 'chess_char_6_14_a':'Lumen', 'chess_char_6_19_a':'Blkkgt', 'chess_char_6_03_a':'Yu', 'chess_char_6_02_a':'Sbell2', 'chess_char_6_17_a':'Nearl2', 'chess_char_6_07_a':'Siege2', 'chess_char_6_16_a':'Halo2', 'chess_char_6_20_a':'Agoat2', 'chess_char_6_09_a':'Cello', 'chess_char_6_08_a':'Reed2', 'chess_char_6_12_a':'Rosmon'})
+    names.update({'chess_char_6_01_a':'Lemuen', 'chess_char_6_10_a':'Nymph', 'chess_char_6_05_a':'Pasngr', 'chess_char_6_06_a':'Pepe', 'chess_char_6_15_a':'Qiubai', 'chess_char_6_14_a':'Lumen', 'chess_char_6_19_a':'Blkkgt', 'chess_char_6_03_a':'Yu', 'chess_char_6_02_a':'Sbell2', 'chess_char_6_17_a':'Nearl2', 'chess_char_6_07_a':'Siege2', 'chess_char_6_16_a':'Halo2', 'chess_char_6_20_a':'Agoat2', 'chess_char_6_09_a':'Cello', 'chess_char_6_08_a':'Reed2', 'chess_char_6_12_a':'Rosmon', 'chess_char_6_04_a':'Skadi2', 'chess_char_6_13_a':'Angel2', 'chess_char_6_18_a':'Whitw2', 'chess_char_6_11_a':'Mlyss'})
     if base not in names: return 'nullptr'
     name = names[base]
     skill = raw.get('skill') or {}
@@ -553,6 +560,58 @@ def build_operator_kit(tables, key, raw, token=False):
         mods = {}
         if mode == 'DIGNITY': has_attack = True; hits = str(max(1, text_count(description, r'(\d+|[一二两三四五])连击', 3)))+'U'
         else: kind = 'INSTANT'; trigger = 'SkillTrigger::NEVER'
+    elif name == 'Mlyss':
+        t1 = next((t.get('bb') or {} for t in raw.get('talents', []) if t.get('index') == 1), {})
+        module_bb = {}
+        for t in raw.get('talents', []):
+            if t.get('index') == -1:
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
+        mode = 'LUBRICATION' if selected == 'skchr_mlyss_1' else 'ECOLOGY' if selected == 'skchr_mlyss_2' else 'ADAPTATION'
+        cut_match = re.search(r'伤害降低(\d+(?:\.\d+)?)%', (raw.get('trait') or {}).get('moduleDesc') or '')
+        rules = record('MlyssKit', MySkill='MlyssSkillKind::'+mode, MyManifold=quote(next((t.get('tokenKey') for t in raw.get('talents', []) if t.get('index') == 0 and t.get('tokenKey')), (raw.get('tokens') or ['token_10030_mlyss_wtrman'])[0])),
+            MyAttack=number(num(bb.get('atk'))), MyAttackSpeed=number(num(bb.get('attack_speed'))), MyDp=number(num(bb.get('cost'), 1 if mode == 'LUBRICATION' else 0)), MyDpCount=str(max(0, math.floor(num(bb.get('fake_cost'), 11))))+'U', MyDpInterval=number(max(0.1, bv(bb, 'interval', 1.364))), MyPulseInterval=number(max(0.2, bv(bb, 'interval', 2))), MyBind=number(bv(bb, 'duration', 1.5)) if default else '0',
+            MyRegen=number(num(bb.get('hp_recovery_per_sec_by_max_hp_ratio'))), MyProtection=number(num(bb.get('damage_resistance'))), MyRhineSp=number(num(module_bb.get('sp'))), MyRhineOtherSp=number(num(module_bb.get('sp_other'))), MyCostCut=number(num(t1.get('cost'))), MyFirstCostCut=number(num(t1.get('runtime_cost'))), MyReinforcementCut=number(float(cut_match[1])/100 if cut_match else 0))
+        mods = dict(atkPct=num(bb.get('atk')))
+        if mode == 'LUBRICATION': mods['aspd'] = num(bb.get('attack_speed'))
+    elif name == 'Whitw2':
+        t1 = next((t.get('bb') or {} for t in raw.get('talents', []) if t.get('index') == 1), {})
+        mode = 'LAZY' if selected == 'skchr_whitw2_1' else 'HUNT' if selected == 'skchr_whitw2_2' else 'HAVOC'
+        rules = record('Whitw2Kit', MySkill='Whitw2SkillKind::'+mode, MyDrones=str(max(1, 1+math.floor(num(bb.get('attack@cnt')))))+'U', MySpreadTime=number(max(0, num(bb.get('attack@times'), 1.3))), MyRadius=number(num(bb.get('attack@range_radius'), 0.9)),
+            MyDotScale=number(num(bb.get('attack@magic_atk_scale'), 1)), MyFear=number(num(bb.get('attack@fear'))), MyFearChance=number(num(bb.get('attack@prob'))), MySlow=number(num(bb.get('attack@move_speed'))), MyStageInterval=number(max(1, num(talent.get('interval'), 20))),
+            MyCapScale=number(num(talent.get('scale'), 1)), MySilence=number(num(talent.get('attack@silence_duration'))), MyTeamSp=number(num(t1.get('sp'))), MyTeamSpeed=number(num(t1.get('attack_speed'))))
+        mods = dict(atkPct=num(bb.get('atk')))
+        if mode == 'LAZY': kind = 'TOGGLE'; grid = [[r,c] for r in range(-18,19) for c in range(-20,21)]
+        elif mode == 'HUNT': grid = skill.get('rangeGrid'); has_attack = True; hits = '1U'
+        else: has_attack = no_attack = True
+    elif name == 'Skadi2':
+        t1 = next((t.get('bb') or {} for t in raw.get('talents', []) if t.get('index') == 1), {})
+        module_bb = {}
+        for t in raw.get('talents', []):
+            if t.get('index') == -1:
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
+        a1 = num(t1.get('skadi2_e_003_t_2[atk][1].atk'), bv(t1, 'skadi2_t_2[atk][1].atk'))
+        a2 = num(t1.get('skadi2_e_003_t_2[atk][2].atk'), bv(t1, 'skadi2_t_2[atk][2].atk', a1))
+        mode = 'SEPARATE' if selected == 'skchr_skadi2_1' else 'PRAYER' if selected == 'skchr_skadi2_2' else 'TIDE'
+        life_text = next((t.get('description') or t.get('desc') or '' for t in raw.get('talents', []) if t.get('index') == 0), '')
+        life_match = re.search(r'持续(\d+(?:\.\d+)?)秒', life_text)
+        rules = record('Skadi2Kit', MySkill='Skadi2SkillKind::'+mode, MySeaborn=quote(next((t.get('tokenKey') for t in raw.get('talents', []) if t.get('index') == 0 and t.get('tokenKey')), (raw.get('tokens') or ['token_10017_skadi2_dedant'])[0])), MyDefault=boolean(default),
+            MySeabornLifetime=number(float(life_match.group(1)) if life_match else 25), MyBaseRatio=number(num(trait.get('attack@atk_to_hp_recovery_ratio'), 0.1)), MySkillRatio=number(num(bb.get('attack@atk_to_hp_recovery_ratio'), num(trait.get('attack@atk_to_hp_recovery_ratio'), 0.1))),
+            MyInspireAttack=number(num(bb.get('atk'))), MyInspireDefense=number(num(bb.get('def'))), MyTideScale=number(num(bb.get('atk_scale'))), MyHealthLoss=number(num(bb.get('hp_ratio'))), MyShare=number(max(0, min(1, num(bb.get('damage_resistance'))))), MyFlatReduction=number(max(0, -num(module_bb.get('damage_resistance')))),
+            MyPredatorAttack=number(a1), MyAbyssalAttack=number(a2), MyPredatorDefense=number(num(t1.get('skadi2_e_003_t_2[def].def'))), MyDeploySp=number(num(t1.get('sp'))), MyModuleCount=number(num(module_bb.get('cnt'))) if 'cnt' in module_bb else 'std::numeric_limits<double>::infinity()', MyModuleAttack=number(num(module_bb.get('atk'))))
+        mods = dict(hpPct=num(bb.get('max_hp'))) if mode == 'SEPARATE' else {}
+        if mode == 'PRAYER': kind = 'TOGGLE'; trigger = 'SkillTrigger::SP_FULL'
+    elif name == 'Angel2':
+        t1 = next((t.get('bb') or {} for t in raw.get('talents', []) if t.get('index') == 1), {})
+        mode = 'SKY' if selected == 'skchr_angel2_1' else 'DELIVERY' if selected == 'skchr_angel2_3' else 'ADDICTION'
+        rules = record('Angel2Kit', MySkill='Angel2SkillKind::'+mode, MyCoordinate=quote(next((t for t in raw.get('tokens') or [] if 'angel2_target' in t), 'token_10056_angel2_target')),
+            MyAttackScale=number(num(bb.get('attack@atk_scale'), 1)), MyCannonScale=number(num(bb.get('attack@cannon_atk_scale'), 1)), MyDeliverySp=number(num(bb.get('attack@sp'))), MyStealSpeed=number(num(bb.get('steal'))), MyExtraAmmo=str(math.floor(num(bb.get('addtional_ammo_each')))),
+            MyShieldRatio=number(num(bb.get('shield_max_hp_ratio'))), MyShieldDuration=number(num(bb.get('shield_max_duration'))), MyAmmoHeal=number(num(talent.get('hp_ratio'))), MyAirstrikeChance=number(num(talent.get('prob'))), MyAirstrikeScale=number(num(talent.get('aoe_atk_scale'), num(talent.get('damage_scale')))),
+            MyCovenantAttack=number(num(t1.get('atk'))), MyCovenantMultiplier=number(num(t1.get('mult'), 1)), MyCalmHealth=number(num(trait.get('angel2_tr[e].hp_ratio'), bv(trait, 'hp_ratio'))), MyCalmSp=number(bv(trait, 'sp_recovery_per_sec')) if 'angel2_tr[e].hp_ratio' in trait else '0')
+        kind = 'AMMO'; ammo = max(1, math.floor(num(bb.get('attack@trigger_time'), 8 if mode == 'SKY' else 50 if mode == 'DELIVERY' else 10)))
+        has_attack = True; scale = number(num(bb.get('attack@atk_scale'), 1))
+        mods = dict(atkPct=num(bb.get('atk'))) if mode == 'DELIVERY' else dict(batPct=max(-0.9, delta if delta > 0 else delta/bat)) if mode == 'ADDICTION' else {}
+        if mode == 'SKY': priority = 'TargetPriority::FLYING'
+        if mode == 'DELIVERY': hits = '5U'
     elif name == 'Rosmon':
         t1 = next((t.get('bb') or {} for t in raw.get('talents', []) if t.get('index') == 1), {})
         mode = 'THOUGHT' if selected == 'skchr_rosmon_1' else 'WISH' if selected == 'skchr_rosmon_3' else 'NERVES'
@@ -569,7 +628,7 @@ def build_operator_kit(tables, key, raw, token=False):
         module_bb = {}
         for t in raw.get('talents', []):
             if t.get('index') == -1:
-                for k, v in (t.get('bb') or {}).items(): module_bb.setdefault(k, v)
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
         mode = 'REQUIEM' if selected == 'skchr_cello_2' else 'TANGO' if selected == 'skchr_cello_3' else 'ECSTASY'
         rules = record('CelloKit', MySkill='CelloSkillKind::'+mode, MySkillElement=number(num(bb.get('ep_damage_ratio'))), MyElementRatio=number(num(talent.get('ep_damage_ratio'))), MySluggish=number(num(talent.get('sluggish'))),
             MyAmplification=number(num(t1.get('ep_damage_scale'), 1)), MyFragile=number(num(t1.get('damage_scale'), 1)-1), MyEliteScale=number(num(trait.get('ep_damage_scale'), 1)), MyFieldWide=boolean(t1.get('damage_value') is not None),
@@ -584,7 +643,7 @@ def build_operator_kit(tables, key, raw, token=False):
         module_bb = {}
         for t in raw.get('talents', []):
             if t.get('index') == -1:
-                for k, v in (t.get('bb') or {}).items(): module_bb.setdefault(k, v)
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
         mode = 'QUICK' if selected == 'skcom_quickattack[3]' else 'FIREBALLS' if selected == 'skchr_reed2_2' else 'SEEDS'
         rules = record('Reed2Kit', MySkill='Reed2SkillKind::'+mode, MyChance=number(num(talent.get('prob'))), MySkillChance=number(num(bb.get('talent@prob'), num(talent.get('prob')))),
             MyScorchAttack=number(num(talent.get('atk'))), MyScorchFragile=number(num(talent.get('damage_scale'), 1)-1), MyScorchDuration=number(num(talent.get('duration'), 6)), MyDot=number(num(bb.get('talent@s3_atk_scale'))),
@@ -601,7 +660,7 @@ def build_operator_kit(tables, key, raw, token=False):
         module_bb = {}
         for t in raw.get('talents', []):
             if t.get('index') == -1:
-                for k, v in (t.get('bb') or {}).items(): module_bb.setdefault(k, v)
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
         mode = 'STARS' if selected == 'skchr_halo2_1' else 'GRAVITY' if selected == 'skchr_halo2_2' else 'LINKS'
         rules = record('Halo2Kit', MySkill='Halo2SkillKind::'+mode, MyTargets=str(max(1, math.floor(num(bb.get('attack@max_target'), 1))))+'U', MyShare=number(num(bb.get('attack@atk_share'))),
             MyBounces=str(max(0, math.floor(num(bb.get('attack@chain.max_target'), 3))))+'U', MyBounceRadius=number(num(bb.get('attack@projectile_range'), 1.7)), MyPullTargets=str(max(0, math.floor(num(bb.get('max_target'), 2))))+'U',
@@ -643,7 +702,7 @@ def build_operator_kit(tables, key, raw, token=False):
         module_bb = {}
         for t in raw.get('talents', []):
             if t.get('index') == -1:
-                for k, v in (t.get('bb') or {}).items(): module_bb.setdefault(k, v)
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
         mode = 'REFORGE' if selected == 'skchr_siege2_1' else 'HOMELAND' if selected == 'skchr_siege2_2' else 'NAME'
         rules = record('Siege2Kit', MySkill='Siege2SkillKind::'+mode, MyTalentRange=tables.grid(tgrid), MySkillRange=tables.grid(skill.get('rangeGrid') or [[0,0],[1,0],[-1,0],[0,1],[0,-1]]),
             MyLion=quote(next((t for t in raw.get('tokens') or [] if 'vlion' in t), 'token_10040_siege2_vlion')), MyBurstScale=number(num(bb.get('atk_scale'))), MyReduction=number(num(talent.get('damage_resistance'))),
@@ -660,7 +719,7 @@ def build_operator_kit(tables, key, raw, token=False):
         module_bb = {}
         for t in raw.get('talents', []):
             if t.get('index') == -1:
-                for k, v in (t.get('bb') or {}).items(): module_bb.setdefault(k, v)
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
         mode = 'BREEZE' if selected == 'skchr_sbell2_1' else 'WAVES' if selected == 'skchr_sbell2_2' else 'BOW'
         rules = record('Sbell2Kit', MySkill='Sbell2SkillKind::'+mode, MyIceToken=quote(next((t for t in raw.get('tokens') or [] if 'icetgt' in t), 'token_10058_sbell2_icetgt')),
             MyMaxSnow=str(max(1, math.floor(num(talent.get('max_cast_cnt'), 5))))+'U', MyInterval=number(num(talent.get('interval'), 5.5)), MySkillInterval=number(num(bb.get('interval'), num(talent.get('interval'), 5.5))),
@@ -694,7 +753,7 @@ def build_operator_kit(tables, key, raw, token=False):
         module_bb = {}
         for t in raw.get('talents', []):
             if t.get('index') == -1:
-                for k, v in (t.get('bb') or {}).items(): module_bb.setdefault(k, v)
+                for k, v in (t.get('bb') or {}).items(): module_bb[k] = v
         mode = 'HOST' if selected == 'skchr_yu_1' else 'GUEST' if selected == 'skchr_yu_2' else 'WALL'
         rules = record('YuKit', MySkill='YuSkillKind::'+mode, MyRange=tables.grid(skill.get('rangeGrid') or [[1,-1],[1,0],[1,1],[0,-1],[0,1],[-1,-1],[-1,0],[-1,1]]),
             MyProtection=number(num(talent.get('damage_resistance'))), MyDamageScale=number(bv(talent, 'atk_scale')), MyElementRatio=number(bv(talent, 'ep_damage_ratio')), MyInterval=number(max(0.1, bv(talent, 'interval', 1))),

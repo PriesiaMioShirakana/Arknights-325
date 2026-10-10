@@ -197,6 +197,10 @@ def body(tables, key, raw, token=False, abnormal=(), selection=None):
         limit = st.get('deployLimit', raw.get('deployLimit'))
         token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::HEAL_DRONE', MyLifetime=number(life),
             MyDeployLimit=str(max(0, math.floor(limit)))+'U' if limit is not None else '0U', MyCountdown='true')
+    elif token and key == 'token_10003_cgbird_bird':
+        talent = next((t.get('bb') or {} for t in reversed(raw.get('talents') or []) if 'prob' in (t.get('bb') or {})), {})
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::CGBIRD_PHANTOM',
+            MyDodgeProbability=number(talent.get('prob', 0)), MyHealthLossRatio=number(talent.get('hp_ratio', 0)))
     elif token and key == 'token_10022_kazema_shadow':
         limit = st.get('deployLimit', raw.get('deployLimit'))
         scale = next(((t.get('bb') or {})['damage_scale'] for t in raw.get('talents', []) if 'damage_scale' in (t.get('bb') or {})), 0)
@@ -232,6 +236,23 @@ def body(tables, key, raw, token=False, abnormal=(), selection=None):
         rule = record('CatShieldDefinition', MyIdle=number(bb.get('interval', 0)), MyInterval=number(max(0.000001, bb.get('catsld_t_1[timer][interval].interval', 1))),
             MyMaxRatio=number(bb.get('max_shield_ratio', 0)), MyRefill=number(bb.get('shield_ratio_each_trigger', 0)))
         token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::CAT_SHIELD', MyDeployLimit=str(max(0, int(raw.get('deployLimit', st.get('deployLimit', 2)))))+'U', MyCatShield=rule)
+    elif token and key == 'token_10030_mlyss_wtrman':
+        token_talents = raw.get('talents') or []
+        find_bb = lambda key: next((t.get('bb') or {} for t in token_talents if key in (t.get('bb') or {})), {})
+        copy = find_bb('scale'); steal = find_bb('steal_atk')
+        rule = record('ManifoldDefinition', MyScale=number(copy.get('scale', 1)), MyRespawn=number(copy.get('interval', 25)),
+            MyStealAttack=number(steal.get('steal_atk', 0)), MyStealDefense=number(steal.get('steal_def', steal.get('steal_atk', 0))), MyAttackCap=number(steal.get('steal_atk_max', 0)), MyDefenseCap=number(steal.get('steal_def_max', steal.get('steal_atk_max', 0))),
+            MySplitEvery=str(max(0, int(steal.get('mlyss_wtrman_t_2[range].max_stack_cnt', 0))))+'U', MySplitLife=number(steal.get('interval', 25)), MyFirstSp=number(find_bb('sp').get('sp', 0)), MyBlockedScale=number(find_bb('damage_scale').get('damage_scale', 1)), MyBlockedTaunt=number(find_bb('taunt_level').get('taunt_level', 0)), MyForce=number((raw_skill.get('bb') or {}).get('force', 0)),
+            MySpCost=number(raw_skill.get('spCost', 100)), MyInitialSp=number(raw_skill.get('initSp', 95)))
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::MANIFOLD', MyDeployLimit=str(max(0, int(raw.get('deployLimit', st.get('deployLimit', 1)))))+'U', MyManifold=rule)
+    elif token and key == 'token_10017_skadi2_dedant':
+        token_talents = raw.get('talents') or []
+        life = next((t.get('bb', {}).get('duration') for t in token_talents if 'duration' in (t.get('bb') or {})), 0)
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::SEABORN', MyLifetime=number(life), MyCountdown='true', MyLifetimeSpecified=boolean(any('duration' in (t.get('bb') or {}) for t in token_talents)),
+            MySeabornHealRatio=number((raw.get('trait') or {}).get('bb', {}).get('attack@atk_to_hp_recovery_ratio', 0)), MySeabornDamageScale=number((raw_skill.get('bb') or {}).get('atk_scale', 0)), MySeabornInspire=number((raw_skill.get('bb') or {}).get('atk', 0)))
+    elif token and key == 'token_10056_angel2_target':
+        token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::DELIVERY_TARGET')
+        if 'UNTARGETABLE' not in starting: starting.append('UNTARGETABLE')
     elif token and key == 'token_10012_rosmon_shield':
         talent_bb = next((t.get('bb') or {} for t in raw.get('talents') or [] if 'duration' in (t.get('bb') or {})), {})
         token_kit = record('TokenKitDefinition', MyKind='TokenKitKind::ROSMON_GEAR', MyLifetime=number(talent_bb.get('duration', 0)), MyDeployLimit=str(max(0, int(raw.get('deployLimit', st.get('deployLimit', 0)))))+'U',

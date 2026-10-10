@@ -1,12 +1,13 @@
 #ifndef STRONGHOLD_SIMULATION_COMBAT_TYPES_HPP
 #define STRONGHOLD_SIMULATION_COMBAT_TYPES_HPP
 #include <deque>
+#include <stronghold/simulation/component_tags.hpp>
 #include <stronghold/simulation/bond_effects.hpp>
 #include <stronghold/simulation/garrison_effects.hpp>
 #include <stronghold/simulation/band_effects.hpp>
 #include <stronghold/simulation/equipment_effects.hpp>
 #include <stronghold/simulation/choice_effects.hpp>
-#include <stronghold/simulation/operator_kits.hpp>
+#include <stronghold/simulation/operator_kits_fwd.hpp>
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -28,6 +29,9 @@
 namespace Stronghold
 {
 	class ContentRegistry;
+	class ComponentRegistry;
+	struct EffectProgram;
+	struct MechanismDefinition;
 	class FinalAssault;
 	using UnitId = std::uint32_t;
 
@@ -228,6 +232,7 @@ namespace Stronghold
 		std::array<double, static_cast<std::size_t>(CombatStatus::COUNT)> MyRemaining{};
 		std::array<double, static_cast<std::size_t>(CombatStatus::COUNT)> MyValues{};
 		std::array<double, static_cast<std::size_t>(CombatStatus::COUNT)> MyStrengths{};
+		UnitId MyBindSource{};
 		std::array<std::optional<StatusTail>, static_cast<std::size_t>(CombatStatus::COUNT)> MyTails;
 		std::optional<WorldPoint> MyAttractPoint{};
 		double MyResistAccumulator{};
@@ -255,7 +260,8 @@ namespace Stronghold
 	};
 
 	// 静态位标记让内置与自定义效果区分环境/持续伤害，不在伤害热路径比较字符串。
-	enum class DamageTag : std::uint64_t { TERRAIN = 1, DOT = 2, PERIODIC = 4, DEEPSEA = 8, TALENT = 16, AFTERSHOCK = 32, HP_LOSS = 64, ITEM = 128, STEAD_SHARE = 256, STEAD_THORN = 512, BOND = 1024, ADDITION = 2048, SKILL = 4096, BURST = 8192, COUNTER = 16384, REFLECT = 32768, CHAIN = 65536, ZONE = 131072, NECROSIS = 262144, APOPTOSIS = 524288, DRAG = 1048576, SONIC = 2097152, MODULE = 4194304, SUMMON = 8388608, TRAP = 16777216, PINECN_SPIKE = 33554432, SNHUNT = 67108864, CLOUDBEAST = 134217728, ELEMENTAL = 268435456, SLASH = 536870912, FIREWALL = 1073741824, SNOW = 2147483648, LINK = 4294967296ULL, ELEMENT_DAMAGE = 8589934592ULL, FIREBALL = 17179869184ULL, SCORCH = 34359738368ULL };
+	enum class DamageTag : std::uint64_t { TERRAIN = 1, DOT = 2, PERIODIC = 4, DEEPSEA = 8, TALENT = 16, AFTERSHOCK = 32, HP_LOSS = 64, ITEM = 128, STEAD_SHARE = 256, STEAD_THORN = 512, BOND = 1024, ADDITION = 2048, SKILL = 4096, BURST = 8192, COUNTER = 16384, REFLECT = 32768, CHAIN = 65536, ZONE = 131072, NECROSIS = 262144, APOPTOSIS = 524288, DRAG = 1048576, SONIC = 2097152, MODULE = 4194304, SUMMON = 8388608, TRAP = 16777216, PINECN_SPIKE = 33554432, SNHUNT = 67108864, CLOUDBEAST = 134217728, ELEMENTAL = 268435456, SLASH = 536870912, FIREWALL = 1073741824, SNOW = 2147483648, LINK = 4294967296ULL, ELEMENT_DAMAGE = 8589934592ULL, FIREBALL = 17179869184ULL, SCORCH = 34359738368ULL, TIDE = 68719476736ULL, TRANSFER = 137438953472ULL, VOLLEY = 274877906944ULL, DELIVERY = 549755813888ULL, AIRSTRIKE = 1099511627776ULL, DRONE_ATTACK = 2199023255552ULL, DRONE = 4398046511104ULL, MISERY_PULL = 8796093022208ULL,
+		AMGOAT_IGNITE = 17592186044416ULL };
 	using DamageTags = std::uint64_t;
 	[[nodiscard]] constexpr DamageTags operator|(DamageTag _left, DamageTag _right) noexcept
 	{ return static_cast<DamageTags>(_left) | static_cast<DamageTags>(_right); }
@@ -288,7 +294,11 @@ namespace Stronghold
 		std::uint64_t MySequence{};
 		bool MyPrecisionCritical{};
 		bool MyMlynarOwn{};
+		UnitId MySkadiShareSource{};
+		double MySkadiShare{};
+		std::uint64_t MyAttackId{}; // Shared across all targets, hits and projectiles of an attack.
 		bool MySunbrProc{}; // 同一次伤害的攻击前抽签结果；闪避／取消不会进入命中后的眩晕。
+		bool MyDiyPierce{};
 	};
 
 	// 再生绕过治疗倍率和禁疗（healFree），但仍通知回调；溢出盾上限为目标当前最大生命。
@@ -358,7 +368,7 @@ namespace Stronghold
 	};
 
 	// 内置到期行为静态分派；自定义 Buff 仍只通过 CUSTOM_BUFF 扩展。
-	enum class BuiltinBuff { NONE, DOLL_SWITCH, DOLL_FORM, SARGON_STACK, SIRACUSA_STEALTH, RMIXER_SHIELD };
+	enum class BuiltinBuff { NONE, DOLL_SWITCH, DOLL_FORM, SARGON_STACK, SIRACUSA_STEALTH, RMIXER_SHIELD, DECAYING_SHIELD, MECHANIST_FEEDBACK, SHARED_BARRIER };
 
 	struct BuffStrengthTail
 	{
@@ -401,6 +411,7 @@ namespace Stronghold
 		bool MyNotifyTick{}; // 内置内容显式订阅此 Buff 的 interval；普通 Buff 不广播周期事件。
 		double MyShieldBreakSp{};
 		std::optional<CombatStatus> MyStatus{}; // 状态来源 Buff 可由替身切换清除；普通属性增益保留。
+		std::string_view MyBarrierStatKey{}; // Static key shared by independently expiring barriers.
 	};
 
 	struct CombatBuff
@@ -515,11 +526,13 @@ namespace Stronghold
 		bool MySkillDamage{};
 		DamageTags MyTags{};
 		bool MyPerTargetFunnel{};
+		bool MyFunnelPerHit{};
 		bool MyLockedFunnel{};
 		bool MyProgressiveHits{};
 		std::optional<double> MyCriticalProbability{};
 		double MyCriticalScale{1};
 		double MyOperatorBonusScale{};
+		std::uint64_t MyAttackId{};
 	};
 
 	// 技能状态机是普通值类型；内置逻辑不经过注册表或虚函数。
@@ -552,6 +565,11 @@ namespace Stronghold
 		std::optional<AttackProfile> MyAttack{};
 		std::vector<AttributeChange> MyModifiers{};
 		StatusFlags MyFlags{};
+		ComponentReference MyCustom{};
+		const EffectProgram* MyStartEffects{};
+		const EffectProgram* MyTickEffects{};
+		const EffectProgram* MyEndingEffects{};
+		const EffectProgram* MyEndEffects{};
 	};
 
 	struct GenericStatusEffect
@@ -679,7 +697,25 @@ namespace Stronghold
 
 	enum class OperatorProfession { NONE, PIONEER, WARRIOR, TANK, SNIPER, CASTER, MEDIC, SUPPORT, SPECIAL };
 	enum class TokenSource { NONE, SKILL, UNAVAILABLE };
-	enum class TokenKitKind { HEAL_DRONE, PAPER_DOLL, CHAMPAGNE, CURSE_DOLL, WOLF_PACK, OBELISK, CAT_SHIELD, DUSK_DRAGON, ICE_TARGET, RADIANT_SWORD, GOLDEN_OATH, ROSMON_GEAR };
+	enum class TokenKitKind { HEAL_DRONE, PAPER_DOLL, CHAMPAGNE, CURSE_DOLL, WOLF_PACK, OBELISK, CAT_SHIELD, DUSK_DRAGON, ICE_TARGET, RADIANT_SWORD, GOLDEN_OATH, ROSMON_GEAR, SEABORN, DELIVERY_TARGET, MANIFOLD, CGBIRD_PHANTOM };
+
+	struct ManifoldDefinition
+	{
+		double MyScale{1};
+		double MyRespawn{25};
+		double MyStealAttack{};
+		double MyStealDefense{};
+		double MyAttackCap{};
+		double MyDefenseCap{};
+		unsigned MySplitEvery{};
+		double MySplitLife{25};
+		double MyFirstSp{};
+		double MyBlockedScale{1};
+		double MyBlockedTaunt{};
+		double MyForce{};
+		double MySpCost{100};
+		double MyInitialSp{95};
+	};
 
 	struct WolfPackDefinition
 	{
@@ -721,6 +757,12 @@ namespace Stronghold
 		double MyBlockedScale{1};
 		bool MyTrueDamage{};
 		double MyBlockedDefense{};
+		double MySeabornHealRatio{};
+		double MySeabornDamageScale{};
+		double MySeabornInspire{};
+		std::optional<ManifoldDefinition> MyManifold{};
+		double MyDodgeProbability{};
+		double MyHealthLossRatio{};
 	};
 
 	struct TokenCountdown
@@ -762,6 +804,8 @@ namespace Stronghold
 		std::optional<TokenKitDefinition> MyTokenKit{};
 		std::optional<double> MyOriginalDeploymentCost{};
 		std::optional<double> MyDeviceShieldRate{};
+		ComponentReference MyCustomOperator{};
+		std::span<const MechanismDefinition> MyMechanisms{};
 	};
 
 	struct MapCharacterTile
@@ -846,6 +890,8 @@ namespace Stronghold
 		CombatDefinition MyDefinition{};
 	};
 
+	enum class BattlePlayerKind { PARTICIPANT, VIRTUAL };
+
 	struct BattlePlayerInput
 	{
 		std::string MyPlayerId{};
@@ -860,6 +906,9 @@ namespace Stronghold
 		std::uint64_t MyGainedChess{}; // 当前准备回合获得干员数；天师古鼎等内容使用。
 		std::optional<std::size_t> MyHandUnits{}; // 无显式准备条件时，旧输入可提供手牌数量回退。
 		std::vector<TokenTemplate> MyTokenTemplates{}; // 已按本玩家干员的技能／模组组合，运行时不解析黑板。
+		BattlePlayerKind MyKind{BattlePlayerKind::PARTICIPANT};
+		std::uint32_t MyTeam{};
+		std::string MyPrincipalId{};
 	};
 
 	enum class EnemySpawnTag { NONE, BOSS, PART, BOUNTY, DUCK };
@@ -928,6 +977,7 @@ namespace Stronghold
 		std::optional<double> MyHealth{};
 		double MyDuration{};
 		bool MyUntargetable{};
+		UnitId MyCloneSource{};
 	};
 
 	struct DeviceSpawn
@@ -945,6 +995,7 @@ namespace Stronghold
 		double MyAttackSpeed{100};
 		bool MyRemoveOnDeploy{};
 		bool MyAfterDeployment{};
+		std::string MyPlayerId{};
 	};
 
 	struct TurretSpawn
@@ -1021,6 +1072,7 @@ namespace Stronghold
 		RulePositionMode MyRulePositionMode{RulePositionMode::CURRENT};
 		bool MyGarrisonEffectsAfterExit{}; // 退场后继续提供依赖来源在场的战斗特质；未部署单位不因此激活。
 		bool MyRetainGrantedGarrisonsAfterExit{true}; // 接受者退场后保留获授特质；关闭则本场移除，不因重部署恢复。
+		std::optional<std::reference_wrapper<const ComponentRegistry>> MyComponentRegistry{};
 	};
 
 	struct UnitCombatTotals
@@ -1108,6 +1160,51 @@ namespace Stronghold
 		double MyAccumulator{};
 	};
 
+	enum class DroneFlightPhase { SPREAD, SEEK, CHASE, LOCK };
+
+	struct FlyingDrone
+	{
+		WorldPoint MyPosition{};
+		WorldPoint MyHeading{};
+		double MySpeed{0.1};
+		double MyAge{};
+		DroneFlightPhase MyPhase{DroneFlightPhase::SPREAD};
+		UnitId MyTarget{};
+		double MyCooldown{};
+		UnitId MyRampTarget{};
+		double MyRamp{};
+		std::optional<WorldPoint> MyOrbit{};
+	};
+
+	struct ManifoldState
+	{
+		CombatStats MyDefaultStats{};
+		AttackProfile MyDefaultAttack{};
+		std::vector<RangeOffset> MyDefaultRange{};
+		UnitId MyFrom{};
+		bool MyRanged{};
+		double MyStolenAttack{};
+		double MyStolenDefense{};
+		std::uint64_t MyAttacks{};
+		bool MyFirstSpDone{};
+		unsigned MyBaseHits{1};
+		std::uint64_t MyTriggerRange{};
+		WorldPoint MyRespawnHome{};
+	};
+
+	struct StolenStats
+	{
+		double MyAttack{};
+		double MyDefense{};
+	};
+
+	struct StandinAttackMark
+	{
+		UnitId MyTarget{};
+		std::uint64_t MyAttack{};
+		bool MyExtra{};
+	};
+
 	struct CombatUnit
 	{
 		UnitId MyId{};
@@ -1133,8 +1230,6 @@ namespace Stronghold
 		WorldPoint MyPosition{};
 		WorldPoint MyHome{};
 		double MyGenericCounterReadyAt{-std::numeric_limits<double>::infinity()};
-		std::uint64_t MyGenericShieldBuff{};
-		double MyGenericShieldLoss{};
 		unsigned MyTinmanZones{};
 		std::uint64_t MyTinmanZoneSequence{};
 		double MyIndigoAccumulator{};
@@ -1250,6 +1345,56 @@ namespace Stronghold
 		unsigned MyPepeStacks{};
 		double MyPepeRadius{1};
 		bool MyPepeBoost{};
+		unsigned MyWolfStage{};
+		std::optional<ManifoldState> MyManifold{};
+		UnitId MyTokenCloneSource{};
+		UnitId MyStandinStackTarget{};
+		double MyStandinAccumulator{};
+		unsigned MyStandinDpCount{};
+		unsigned MyStandinCasts{};
+		std::vector<StandinAttackMark> MyStandinMarks{};
+		std::vector<UnitId> MyStandinPullLanded{};
+		std::uint64_t MyRaidianAttack{};
+		bool MyRaidianMiss{};
+		std::uint64_t MyDiyReviveDeployment{};
+		unsigned MyDiyTokenStock{};
+		std::uint64_t MyDiyRollId{};
+		bool MyDiyProc{};
+		std::vector<unsigned> MyDiyDroneStacks{};
+		std::vector<UnitId> MyDiyStudents{};
+		std::vector<UnitId> MyDiyLinks{};
+		unsigned MyDiyLinkStrikes{};
+		UnitId MyDiyBlessHolder{};
+		std::string MyDiyBlessKey{};
+		std::vector<double> MyDiySpAccumulators{};
+		std::uint64_t MyDiyCastDeployment{};
+		unsigned MyDiyCasts{};
+		double MyDiySkillAccumulator{};
+		unsigned MyDiySkillCount{};
+		UnitId MyDiySkillTarget{};
+		bool MyDiySlashing{};
+
+		StolenStats MyMlyssRobbed{};
+		StolenStats MyManifoldRobbed{};
+		bool MyMlyssFirst{};
+		UnitId MyMlyssPendingToken{};
+		std::uint64_t MyMlyssRespawnVersion{};
+		double MyMlyssDpAccumulator{};
+		unsigned MyMlyssDpCount{};
+		unsigned MyWolfBaseHits{1};
+		double MyWolfBaseCap{1.1};
+		UnitId MyLazyLock{};
+		std::vector<UnitId> MyHuntLocks{};
+		std::vector<FlyingDrone> MyFlyingDrones{};
+		double MyFlyingDroneAccumulator{};
+		std::uint64_t MySiracusaHonorDeployment{};
+
+		unsigned MySkadiPulses{};
+		double MySeabornAccumulator{};
+		UnitId MyAngelVictim{};
+		bool MyAngelCoordinate{};
+		double MyAngelAmmoLeft{};
+
 		double MyRosmonRadius{};
 		unsigned MyRosmonShocks{};
 		bool MyRosmonSaved{};
@@ -1472,6 +1617,9 @@ namespace Stronghold
 		std::vector<LeakedEnemy> MyLeaks{};
 		std::vector<UnitEndState> MyUnitsEnd{}; // 仅 Result() 填充；不在每帧复制。
 		std::vector<BondLayer> MyLayerGains{}; // 本场累计收益，与可修改的实时层数分开；索引只追加不重排。
+		BattlePlayerKind MyKind{BattlePlayerKind::PARTICIPANT};
+		std::uint32_t MyTeam{};
+		std::optional<std::size_t> MyPrincipal{};
 	};
 
 	struct BattleEvent
@@ -1497,6 +1645,7 @@ namespace Stronghold
 		std::vector<BattlePlayerState> MyPlayers{};
 		std::optional<double> MyBossHealthLeft{};
 		std::vector<PendingEnemy> MyPendingEnemies{}; // 超时时仍未出生的全部动作，含非计数实体。
+		std::vector<BattlePlayerState> MyVirtualPlayers{};
 	};
 }
 #endif

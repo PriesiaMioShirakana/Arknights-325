@@ -36,7 +36,8 @@ def compose_form(identity, unit, form, si, mid):
     for k in ('immunities','rangeId','rangeGrid','dmgType','attackKind','projectile','canHitFly','targetPriority'):out[k]=form.get(k)
     known=set(form.get('tokens',[]))
     candidates=[*form.get('displayTokens',[]),(skill or {}).get('overrideTokenKey'),*[t.get('tokenKey') for t in talents]]
-    out.update(stats=stats,trait=(mod or {}).get('traitOverride') or form.get('trait'),skill=skill,talents=talents,
+    out.update(statsBase=form['stats'],talentsBase=form.get('talents',[]),traitBase=form.get('trait'),
+        skills=form.get('skills',[]),modules=form.get('modules') or [],stats=stats,trait=(mod or {}).get('traitOverride') or form.get('trait'),skill=skill,talents=talents,
         tokens=sorted(set(t for t in candidates if t and t in known),key=natural),
         module=dict(id=mid,level=level,active=level>0 and bool(mod)) if mid or level>0 else None)
     if identity.get('isGolden') and level > 0:

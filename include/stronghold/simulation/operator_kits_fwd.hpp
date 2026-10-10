@@ -1,0 +1,132 @@
+#ifndef STRONGHOLD_SIMULATION_OPERATOR_KITS_FWD_HPP
+#define STRONGHOLD_SIMULATION_OPERATOR_KITS_FWD_HPP
+#include <variant>
+
+namespace Stronghold
+{
+	struct BasicOperatorKit;
+	struct InsiderKit;
+	struct LeiziKit;
+	struct UdflowKit;
+	struct VignaKit;
+	struct VendlaKit;
+	struct ProveKit;
+	struct TexasKit;
+	struct CaperKit;
+	struct SunbrKit;
+	struct EstellKit;
+	struct PodegoKit;
+	struct PithstKit;
+	struct TinmanKit;
+	struct IndigoKit;
+	struct UtageKit;
+	struct WildmnKit;
+	struct LiskamKit;
+	struct ExcuKit;
+	struct SilentKit;
+	struct SlchanKit;
+	struct GrabdsKit;
+	struct HaroldKit;
+	struct PapyrsKit;
+	struct GhostKit;
+	struct BubbleKit;
+	struct HumusKit;
+	struct RockrKit;
+	struct KazemaKit;
+	struct GravelKit;
+	struct TippiKit;
+	struct FlowerKit;
+	struct AkkordKit;
+	struct WhitewKit;
+	struct BranchKit;
+	struct AshlokKit;
+	struct AngelKit;
+	struct AyerKit;
+	struct SwireKit;
+	struct SkadiKit;
+	struct Swire2Kit;
+	struct PhilaeKit;
+	struct ForcerKit;
+	struct MintKit;
+	struct HainiKit;
+	struct PinecnKit;
+	struct SnhuntKit;
+	struct BlemshKit;
+	struct MalistKit;
+	struct WeakeningKit;
+	struct BlockingDefenseKit;
+	struct ShotstKit;
+	struct VulpisKit;
+	struct KjeraKit;
+	struct ArchetKit;
+	struct VigilKit;
+	struct MostmaKit;
+	struct RmixerKit;
+	struct PrecisionKit;
+	struct BeewaxKit;
+	struct InesKit;
+	struct RosesaKit;
+	struct MizukiKit;
+	struct AromaKit;
+	struct CathyKit;
+	struct GladyKit;
+	struct GnosisKit;
+	struct LionhdKit;
+	struct ReckprKit;
+	struct Texas2Kit;
+	struct HsgumaKit;
+	struct MudrokKit;
+	struct FlamtlKit;
+	struct FartthKit;
+	struct SpAuraKit;
+	struct SvrashKit;
+	struct GvialKit;
+	struct BillroKit;
+	struct BldskKit;
+	struct CetsyrKit;
+	struct Excu2Kit;
+	struct TitiKit;
+	struct Blaze2Kit;
+	struct UlpiaKit;
+	struct EtlchiKit;
+	struct SurtrKit;
+	struct HornKit;
+	struct LisaKit;
+	struct DemkniKit;
+	struct DuskKit;
+	struct Ghost2Kit;
+	struct Svash2Kit;
+	struct F12yinKit;
+	struct AglinaKit;
+	struct SntllaKit;
+	struct NymphKit;
+	struct MlynarKit;
+	struct Thorn2Kit;
+	struct LemuenKit;
+	struct PasngrKit;
+	struct PepeKit;
+	struct QiubaiKit;
+	struct LumenKit;
+	struct BlkkgtKit;
+	struct YuKit;
+	struct Sbell2Kit;
+	struct Nearl2Kit;
+	struct Siege2Kit;
+	struct Halo2Kit;
+	struct Agoat2Kit;
+	struct CelloKit;
+	struct Reed2Kit;
+	struct RosmonKit;
+	struct Skadi2Kit;
+	struct Angel2Kit;
+	struct Whitw2Kit;
+	struct MlyssKit;
+	struct StandinKit;
+	struct DiyOperatorKit;
+
+	using OperatorKitDefinition = std::variant<BasicOperatorKit, InsiderKit, LeiziKit, UdflowKit, VignaKit, VendlaKit, ProveKit, TexasKit, CaperKit, SunbrKit,
+		EstellKit, PodegoKit, PithstKit, TinmanKit, IndigoKit, UtageKit, WildmnKit, LiskamKit,
+		ExcuKit, SilentKit, SlchanKit, GrabdsKit, HaroldKit, PapyrsKit, GhostKit, BubbleKit, HumusKit, RockrKit,
+		KazemaKit, GravelKit, TippiKit, FlowerKit, AkkordKit, WhitewKit, BranchKit, AshlokKit, AngelKit, AyerKit, SwireKit, SkadiKit, Swire2Kit, PhilaeKit, ForcerKit, MintKit, HainiKit, PinecnKit, SnhuntKit, BlemshKit, MalistKit, WeakeningKit, BlockingDefenseKit, ShotstKit, VulpisKit, KjeraKit, ArchetKit, VigilKit, MostmaKit, RmixerKit, PrecisionKit, BeewaxKit, InesKit, RosesaKit, MizukiKit, AromaKit, CathyKit, GladyKit, GnosisKit, LionhdKit, ReckprKit, Texas2Kit, HsgumaKit, MudrokKit, FlamtlKit, FartthKit, SpAuraKit, SvrashKit, GvialKit, BillroKit, BldskKit, CetsyrKit, Excu2Kit, TitiKit, Blaze2Kit, UlpiaKit, EtlchiKit, SurtrKit, HornKit, LisaKit, DemkniKit, DuskKit, Ghost2Kit, Svash2Kit, F12yinKit, AglinaKit, SntllaKit, NymphKit, MlynarKit, Thorn2Kit, LemuenKit, PasngrKit, PepeKit, QiubaiKit, LumenKit, BlkkgtKit, YuKit, Sbell2Kit, Nearl2Kit, Siege2Kit, Halo2Kit, Agoat2Kit, CelloKit, Reed2Kit, RosmonKit, Skadi2Kit, Angel2Kit, Whitw2Kit, MlyssKit, StandinKit, DiyOperatorKit>;
+}
+#endif

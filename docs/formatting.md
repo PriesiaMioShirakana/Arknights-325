@@ -7,8 +7,8 @@
 `tools/resharper.clang-format` 是显式调用的辅助配置，面向 clang-format 22+。主要对应 Tab/4、120 列、Allman 大括号、命名空间缩进、长参数逐行及右括号单独成行、初始化列表冒号前换行。示例（在工作区根目录执行）：
 
 ```powershell
-clang-format --style=file:backend/tools/resharper.clang-format -i backend/src/battle.cpp
-clang-format --style=file:backend/tools/resharper.clang-format --dry-run --Werror backend/src/battle.cpp
+clang-format --style=file:backend/tools/resharper.clang-format -i backend/src/simulation/battle/battle.cpp
+clang-format --style=file:backend/tools/resharper.clang-format --dry-run --Werror backend/src/simulation/battle/battle.cpp
 ```
 
 两种格式器并非完全等价，以下以 ReSharper 为准并人工复核：

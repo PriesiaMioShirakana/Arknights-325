@@ -179,7 +179,12 @@ ATTRIBUTES = {
     'resMul':'RESISTANCE_MULTIPLIER', 'resFlat':'RESISTANCE_FLAT', 'dmgDealtMul':'DAMAGE_DEALT_MULTIPLIER',
     'blockCnt':'BLOCK_COUNT', 'taunt':'TAUNT', 'dmgTakenMul':'DAMAGE_TAKEN_MULTIPLIER', 'hpRegen':'HEALTH_REGEN',
     'hpRegenRatio':'HEALTH_REGEN_RATIO', 'spRecoveryFlat':'SP_RECOVERY_FLAT',
-    'resIgnoreFlat':'RESISTANCE_IGNORE_FLAT', 'defIgnoreFlat':'DEFENSE_IGNORE_FLAT', 'maxTargets':'EXTRA_TARGETS',
+    'resIgnoreFlat':'RESISTANCE_IGNORE_FLAT', 'resIgnorePct':'RESISTANCE_IGNORE_PERCENT',
+    'defIgnoreFlat':'DEFENSE_IGNORE_FLAT', 'defIgnorePct':'DEFENSE_IGNORE_PERCENT', 'maxTargets':'EXTRA_TARGETS',
+    'atkMul':'ATTACK_MULTIPLIER', 'defMul':'DEFENSE_MULTIPLIER', 'hpMul':'HEALTH_MULTIPLIER',
+    'dodgePhys':'PHYSICAL_DODGE', 'dodgeArts':'ARTS_DODGE', 'rangeExtend':'RANGE_EXTEND',
+    'atkScaleMul':'ATTACK_SCALE_MULTIPLIER', 'spRecoveryMul':'SP_RECOVERY_MULTIPLIER',
+    'healingTakenMul':'HEALING_TAKEN_MULTIPLIER',
 }
 
 

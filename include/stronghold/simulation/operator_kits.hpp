@@ -1,7 +1,7 @@
 #ifndef STRONGHOLD_SIMULATION_OPERATOR_KITS_HPP
 #define STRONGHOLD_SIMULATION_OPERATOR_KITS_HPP
 #include <limits>
-#include <variant>
+#include <stronghold/simulation/operator_kits_fwd.hpp>
 #include <span>
 #include <string_view>
 #include <optional>
@@ -10,6 +10,8 @@
 
 namespace Stronghold
 {
+	enum class OperatorProfession;
+
 	struct InsiderKit
 	{
 		double MyDelay{};
@@ -1606,9 +1608,278 @@ namespace Stronghold
 		double MyStableAttack{};
 	};
 
-	using OperatorKitDefinition = std::variant<BasicOperatorKit, InsiderKit, LeiziKit, UdflowKit, VignaKit, VendlaKit, ProveKit, TexasKit, CaperKit, SunbrKit,
-		EstellKit, PodegoKit, PithstKit, TinmanKit, IndigoKit, UtageKit, WildmnKit, LiskamKit,
-		ExcuKit, SilentKit, SlchanKit, GrabdsKit, HaroldKit, PapyrsKit, GhostKit, BubbleKit, HumusKit, RockrKit,
-		KazemaKit, GravelKit, TippiKit, FlowerKit, AkkordKit, WhitewKit, BranchKit, AshlokKit, AngelKit, AyerKit, SwireKit, SkadiKit, Swire2Kit, PhilaeKit, ForcerKit, MintKit, HainiKit, PinecnKit, SnhuntKit, BlemshKit, MalistKit, WeakeningKit, BlockingDefenseKit, ShotstKit, VulpisKit, KjeraKit, ArchetKit, VigilKit, MostmaKit, RmixerKit, PrecisionKit, BeewaxKit, InesKit, RosesaKit, MizukiKit, AromaKit, CathyKit, GladyKit, GnosisKit, LionhdKit, ReckprKit, Texas2Kit, HsgumaKit, MudrokKit, FlamtlKit, FartthKit, SpAuraKit, SvrashKit, GvialKit, BillroKit, BldskKit, CetsyrKit, Excu2Kit, TitiKit, Blaze2Kit, UlpiaKit, EtlchiKit, SurtrKit, HornKit, LisaKit, DemkniKit, DuskKit, Ghost2Kit, Svash2Kit, F12yinKit, AglinaKit, SntllaKit, NymphKit, MlynarKit, Thorn2Kit, LemuenKit, PasngrKit, PepeKit, QiubaiKit, LumenKit, BlkkgtKit, YuKit, Sbell2Kit, Nearl2Kit, Siege2Kit, Halo2Kit, Agoat2Kit, CelloKit, Reed2Kit, RosmonKit>;
+	enum class Whitw2SkillKind { LAZY, HUNT, HAVOC };
+
+	enum class MlyssSkillKind { LUBRICATION, ECOLOGY, ADAPTATION };
+
+	struct MlyssKit
+	{
+		MlyssSkillKind MySkill{MlyssSkillKind::ADAPTATION};
+		std::string_view MyManifold{};
+		double MyAttack{};
+		double MyAttackSpeed{};
+		double MyDp{};
+		unsigned MyDpCount{11};
+		double MyDpInterval{1.364};
+		double MyPulseInterval{2};
+		double MyBind{};
+		double MyRegen{};
+		double MyProtection{};
+		double MyRhineSp{};
+		double MyRhineOtherSp{};
+		double MyCostCut{};
+		double MyFirstCostCut{};
+		double MyReinforcementCut{};
+	};
+
+	struct Whitw2Kit
+	{
+		Whitw2SkillKind MySkill{Whitw2SkillKind::HAVOC};
+		unsigned MyDrones{1};
+		double MySpreadTime{1.3};
+		double MyRadius{0.9};
+		double MyDotScale{1};
+		double MyFear{};
+		double MyFearChance{};
+		double MySlow{};
+		double MyStageInterval{20};
+		double MyCapScale{1};
+		double MySilence{};
+		double MyTeamSp{};
+		double MyTeamSpeed{};
+	};
+
+	enum class Skadi2SkillKind { SEPARATE, PRAYER, TIDE };
+
+	struct Skadi2Kit
+	{
+		Skadi2SkillKind MySkill{Skadi2SkillKind::TIDE};
+		std::string_view MySeaborn{};
+		bool MyDefault{};
+		double MySeabornLifetime{25};
+		double MyBaseRatio{0.1};
+		double MySkillRatio{0.1};
+		double MyInspireAttack{};
+		double MyInspireDefense{};
+		double MyTideScale{};
+		double MyHealthLoss{};
+		double MyShare{};
+		double MyFlatReduction{};
+		double MyPredatorAttack{};
+		double MyAbyssalAttack{};
+		double MyPredatorDefense{};
+		double MyDeploySp{};
+		double MyModuleCount{std::numeric_limits<double>::infinity()};
+		double MyModuleAttack{};
+	};
+
+	enum class Angel2SkillKind { SKY, ADDICTION, DELIVERY };
+
+	struct Angel2Kit
+	{
+		Angel2SkillKind MySkill{Angel2SkillKind::ADDICTION};
+		std::string_view MyCoordinate{};
+		double MyAttackScale{1};
+		double MyCannonScale{1};
+		double MyDeliverySp{};
+		double MyStealSpeed{};
+		int MyExtraAmmo{};
+		double MyShieldRatio{};
+		double MyShieldDuration{};
+		double MyAmmoHeal{};
+		double MyAirstrikeChance{};
+		double MyAirstrikeScale{};
+		double MyCovenantAttack{};
+		double MyCovenantMultiplier{1};
+		double MyCalmHealth{};
+		double MyCalmSp{};
+	};
+
+	// Stand-in records compile data into fixed rules; no runtime blackboard lookup.
+	enum class StandinKind { SHARP, SHARP_LORD, MISERY, MECHANIST, PITH, STORMEYE, TULIP, TOUCH, RAIDIAN };
+
+	enum class OperatorBuffCondition { DEPLOY_ELAPSED, TARGETABLE_RANGE, EXACT_CROSS, LONELY, BLOCKING, HEALTH_BELOW };
+
+	struct ConditionalOperatorBuff
+	{
+		std::string_view MyKey{};
+		OperatorBuffCondition MyCondition{};
+		std::span<const AttributeChange> MyModifiers{};
+		double MyThreshold{};
+		unsigned MyCount{1};
+		bool MyPeriodic{}; // Health checks are sampled every 0.1 s, others follow the tick bus.
+	};
+
+	struct StandinKit
+	{
+		StandinKind MyKind{};
+		unsigned MySkill{1};
+		std::span<const ConditionalOperatorBuff> MyConditions{};
+		double MyProbability{};
+		double MySkillProbability{};
+		double MyCriticalScale{1};
+		double MyBlockedScale{1};
+		double MyStackAttack{};
+		unsigned MyMaxStacks{1};
+		double MyModuleHealthLoss{};
+		double MyBurstScale{};
+		std::span<const RangeOffset> MyBurstRange{};
+		double MyPullForce{};
+		double MySluggish{};
+		double MyFeedbackSpeed{};
+		double MyFeedbackScale{1};
+		double MyAuraValue{};
+		double MySkillAuraValue{};
+		double MySkillAuraScale{1};
+		double MySpPerSecond{};
+		double MyIdleDelay{};
+		double MyExtraHealthRatio{0.9};
+		double MyExtraDamageScale{1};
+		double MyDp{};
+		unsigned MyDpCount{};
+		double MyDpInterval{1};
+		unsigned MyBoundlessCasts{2};
+		double MyKillDp{};
+		unsigned MySlashes{8};
+		double MyDefenseIgnore{};
+		double MyHealHealthRatio{};
+		double MyHealScale{1};
+		double MyHealSp{};
+		double MyDeathSp{};
+		double MyGospelHealthRatio{};
+		double MyGospelHealScale{1};
+		double MyGospelExtraHeal{};
+		double MyPhysicalMiss{};
+		double MyArtsMiss{};
+		double MyFragile{};
+		double MyWeakenMultiplier{1};
+	};
+
+	enum class DiyOperatorKind { HELAGE, ZUMAMA, SIEGE, SHINING, CGBIRD, LESSNG, SHWAZ, GDGLOW, POCA, PALLAS, AMGOAT, CHEN };
+
+	struct FixedOperatorAura
+	{
+		std::string_view MyKey{};
+		Attribute MyAttribute{};
+		double MyValue{};
+		double MyGroundExtra{};
+		std::span<const AttributeChange> MyModifiers{};
+		std::optional<OperatorProfession> MyProfession{};
+		bool MyAttackRange{};
+		bool MySkillActive{};
+		double MyInterval{0.2};
+		double MyDuration{0.25};
+		std::optional<double> MyStrength{};
+		bool MyCarriedSource{};
+	};
+
+	struct PeriodicOperatorSp
+	{
+		double MyAmount{};
+		double MyInterval{1};
+		bool MySelf{};
+		bool MyAttackHurtOnly{};
+		bool MyFieldTime{};
+		std::optional<double> MyProbability{};
+	};
+
+	struct DiyOperatorKit
+	{
+		DiyOperatorKind MyKind{};
+		unsigned MySkill{1};
+		std::span<const FixedOperatorAura> MyAuras{};
+		std::span<const AttributeChange> MyBlockingModifiers{};
+		double MyBerserkSpeed{};
+		double MyBerserkHealthRatio{};
+		double MyRegen{};
+		double MyLowHealthRegen{};
+		double MyRegenHealthRatio{};
+		double MyProtection{};
+		double MyProtectHealthRatio{};
+		double MyHighHealthScale{1};
+		double MyBlockingSp{};
+		std::optional<double> MyUnblockedSpMultiplier{};
+		double MyReviveHealthRatio{};
+		std::span<const AttributeChange> MyReviveModifiers{};
+		double MyEndStun{};
+		double MyDp{};
+		double MyKillSp{};
+		double MyOtherKillSp{};
+		std::span<const RangeOffset> MyKillSpRange{};
+		double MyStunChance{};
+		double MyStunDuration{};
+		double MyBarrierScale{};
+		double MyBarrierDuration{};
+		std::span<const AttributeChange> MyBarrierModifiers{};
+		double MyHealScale{1};
+		double MyHealHealthRatio{};
+		bool MyHealGround{};
+		std::string_view MyToken{};
+		unsigned MyTokenStock{};
+		double MyBlockedScale{1};
+		double MyOathBlockedScale{1};
+		double MyDuelScale{1};
+		double MyDuelDuration{};
+		double MyDuelAttack{};
+		double MyPainAttack{};
+		double MyPainDuration{15};
+		double MyBlockedDefenseIgnore{};
+		double MyOathSelfDamage{};
+		double MyOathHealth{};
+		unsigned MyBaseHealTargets{};
+		double MyProbability{};
+		double MySkillProbability{};
+		double MyCriticalScale{1};
+		double MyDefenseCut{};
+		double MyDefenseCutDuration{5};
+		double MyFrontScale{1};
+		double MyCrossfireAttack{};
+		bool MySquadCrossfire{};
+		unsigned MyDrones{1};
+		unsigned MyMaxStacks{40};
+		double MyBlastScale{};
+		double MySluggish{};
+		double MyHeavyMass{3};
+		double MyHeavyPenetration{};
+		double MyHeavyScale{1};
+		double MyHeavyExtra{};
+		double MyDistanceScale{};
+		double MyDistanceMinimum{1};
+		double MyDistanceMaximum{4.5};
+		double MyStudentAttack{};
+		double MyStudentPerSkill{};
+		double MyStudentSkillCap{std::numeric_limits<double>::infinity()};
+		unsigned MyLinkTargets{3};
+		unsigned MyLinkStrikes{6};
+		double MyLinkInterval{1};
+		double MyPeakHealthRatio{0.8};
+		double MyPeakAttack{};
+		double MyBlessHealthRatio{0.8};
+		double MyBlessAttack{};
+		std::span<const AttributeChange> MyBlessModifiers{};
+		double MyTalentHeal{};
+		double MyNationHeal{};
+		std::span<const AttributeChange> MyFirstCastModifiers{};
+		std::span<const AttributeChange> MyLaterCastModifiers{};
+		double MyInitialSpMinimum{};
+		double MyInitialSpMaximum{};
+		double MyInitialSpeedMinimum{};
+		double MyInitialSpeedMaximum{};
+		bool MyInitialEliteMaximum{};
+		double MyEliteHitSp{};
+		double MyIgniteScale{1};
+		double MyIgniteSecondScale{1};
+		double MyResistanceCut{};
+		double MyResistanceCutDuration{};
+		unsigned MyLavaTargets{1};
+		std::span<const RangeOffset> MyCastRange{};
+		unsigned MyCastTargets{1};
+		double MyCastScale{1};
+		double MySkillDamageMultiplier{1};
+		unsigned MySlashCount{10};
+		std::span<const PeriodicOperatorSp> MyPeriodicSp{};
+	};
+
+
 }
 #endif

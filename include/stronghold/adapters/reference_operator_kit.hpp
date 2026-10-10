@@ -1,6 +1,7 @@
 #ifndef STRONGHOLD_ADAPTERS_REFERENCE_OPERATOR_KIT_HPP
 #define STRONGHOLD_ADAPTERS_REFERENCE_OPERATOR_KIT_HPP
 #include <stronghold/adapters/reference_generic_skill.hpp>
+#include <stronghold/simulation/operator_kits.hpp>
 
 namespace Stronghold
 {
