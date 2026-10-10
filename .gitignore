@@ -4,3 +4,7 @@
 /.idea/
 /.vs/
 __pycache__/
+
+/old/build/
+/old/out/
+/old/CMakeUserPresets.json
